@@ -1,0 +1,61 @@
+{
+  "code": 200,
+  "message": "OK",
+  "data": [
+    {
+      "shipmentBoxId": "COUPANG-SHIPMENT-001",
+      "orderId": "COUPANG-ORDER-001",
+      "orderedAt": "2026-08-09T10:00:00.000000+09:00",
+      "orderer": {
+        "name": "SYNTHETIC_NAME_TO_MASK",
+        "email": "SYNTHETIC_EMAIL_TO_MASK",
+        "safeNumber": "SYNTHETIC_PHONE_TO_MASK",
+        "ordererNumber": null
+      },
+      "paidAt": "2026-08-09T10:01:00.000000+09:00",
+      "status": "FINAL_DELIVERY",
+      "receiver": {
+        "name": "SYNTHETIC_RECEIVER_TO_MASK",
+        "safeNumber": "SYNTHETIC_PHONE_TO_MASK",
+        "receiverNumber": null,
+        "addr1": "SYNTHETIC_ADDRESS_TO_MASK",
+        "addr2": "SYNTHETIC_ADDRESS_DETAIL_TO_MASK",
+        "postCode": "00000"
+      },
+      "orderItems": [
+        {
+          "sequenceNo": "001",
+          "vendorItemPackageId": 0,
+          "vendorItemPackageName": "Synthetic package",
+          "productId": "COUPANG-PRODUCT-001",
+          "vendorItemId": "COUPANG-VENDOR-ITEM-001",
+          "vendorItemName": "Synthetic meal kit, Two portions",
+          "shippingCount": 2,
+          "salesPrice": {
+            "currencyCode": "KRW",
+            "units": 12900,
+            "nanos": 250000000
+          },
+          "sellerProductId": "COUPANG-SELLER-PRODUCT-001",
+          "sellerProductName": "Synthetic meal kit",
+          "sellerProductItemName": "Two portions",
+          "cancelCount": 1,
+          "holdCountForCancel": 0,
+          "estimatedShippingDate": "2026-08-10"
+        }
+      ],
+      "overseaShippingInfoDto": {
+        "personalCustomsClearanceCode": "SYNTHETIC_CUSTOMS_TO_MASK",
+        "ordererSsn": "SYNTHETIC_SSN_TO_MASK",
+        "ordererPhoneNumber": "SYNTHETIC_PHONE_TO_MASK",
+        "oneTimePccc": "SYNTHETIC_PCCC_TO_MASK",
+        "otpNumber": null
+      },
+      "deliveryCompanyName": "CJ Logistics",
+      "invoiceNumber": "SYNTHETIC-INVOICE-001",
+      "inTrasitDateTime": "2026-08-09T18:00:00.000000+09:00",
+      "deliveredDate": "2026-08-10T15:00:00.000000+09:00"
+    }
+  ],
+  "nextToken": null
+}
