@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from xml.etree import ElementTree
@@ -120,9 +121,10 @@ def _order_records(order_element: ElementTree.Element) -> Iterator[ChannelRecord
             "OrderStatus": order_status,
             "PaymentStatus": order.get("orderStatus"),
             "DeliveryStatus": order_status,
-            "OrderedAt": order.get("orderDate"),
-            "PaidAt": item.get("paymentDt") or order.get("paymentDt"),
-            "DispatchedAt": item.get("deliveryDt"),
+            "OrderedAt": _optional_datetime(order.get("orderDate")),
+            "PaidAt": _optional_datetime(item.get("paymentDt"))
+            or _optional_datetime(order.get("paymentDt")),
+            "DispatchedAt": _optional_datetime(item.get("deliveryDt")),
             "DeliveryCompanyCode": _optional_str(item.get("invoiceCompanySno")),
             "TrackingNumber": _optional_str(item.get("invoiceNo")),
             "RawOrderStatus": order_status,
@@ -189,6 +191,19 @@ def _required(values: dict[str, Any], key: str) -> str:
 
 def _optional_str(value: Any) -> str | None:
     return None if value is None or value == "" else str(value)
+
+
+def _optional_datetime(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return text
 
 
 def _integer(value: Any) -> int | None:

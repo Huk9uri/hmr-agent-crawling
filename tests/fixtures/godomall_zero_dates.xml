@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <header><code>000</code><msg>SUCCESS</msg><lastOrder>false</lastOrder></header>
+  <return>
+    <order_data>
+      <orderNo>GODO-ZERO-DATE-ORDER</orderNo>
+      <orderStatus>p1</orderStatus>
+      <orderDate>2026-08-10 10:00:00</orderDate>
+      <paymentDt>0000-00-00 00:00:00</paymentDt>
+      <orderGoodsData>
+        <item>
+          <sno>GODO-ZERO-DATE-ITEM</sno>
+          <goodsNo>GODO-ZERO-DATE-PRODUCT</goodsNo>
+          <goodsNm>Synthetic zero-date item</goodsNm>
+          <goodsCnt>1</goodsCnt>
+          <goodsPrice>3000</goodsPrice>
+          <deliveryDt>0000-00-00 00:00:00</deliveryDt>
+        </item>
+      </orderGoodsData>
+    </order_data>
+  </return>
+</data>

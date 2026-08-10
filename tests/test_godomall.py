@@ -86,10 +86,23 @@ class GodomallAdapterTests(unittest.TestCase):
         self.assertEqual(record.columns["ExternalOrderNo"], "GODO-EXTERNAL-002")
         self.assertEqual(record.columns["ProductCode"], "GODO-PRODUCT-002")
         self.assertEqual(record.columns["Quantity"], 2)
+        self.assertEqual(record.columns["PaidAt"], "2026-08-10 11:01:00")
+        self.assertEqual(record.columns["DispatchedAt"], "2026-08-10 18:00:00")
         self.assertNotIn("SYNTHETIC_NAME_TO_MASK", record.raw_json)
         self.assertNotIn("synthetic@example.invalid", record.raw_json)
         self.assertNotIn("SYNTHETIC_ADDRESS_TO_MASK", record.raw_json)
         self.assertNotIn("SYNTHETIC_SAFE_NUMBER_TO_MASK", record.raw_json)
+
+    def test_zero_datetime_sentinels_are_normalized_to_none(self):
+        record = next(
+            GodomallAdapter(
+                config(), http=FakeHttpClient(["godomall_zero_dates.xml"])
+            ).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))
+        )
+
+        self.assertEqual(record.columns["OrderedAt"], "2026-08-10 10:00:00")
+        self.assertIsNone(record.columns["PaidAt"])
+        self.assertIsNone(record.columns["DispatchedAt"])
 
     def test_successful_empty_response_returns_zero_records(self):
         http = FakeHttpClient(["godomall_empty_page.xml"])
