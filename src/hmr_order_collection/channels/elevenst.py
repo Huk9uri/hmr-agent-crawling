@@ -20,7 +20,7 @@ from hmr_order_collection.models import ChannelRecord
 
 
 BASE_URL = "https://api.11st.co.kr/rest/ordservices"
-ORDER_STATES = ("complete", "packing", "shipping", "delivered")
+ORDER_STATES = ("complete", "shipping")
 ORDER_ENDPOINTS = tuple(f"{BASE_URL}/{state}" for state in ORDER_STATES)
 STATE_PRECEDENCE = {state: precedence for precedence, state in enumerate(ORDER_STATES)}
 _PRIVATE_FIELDS = frozenset(
@@ -51,15 +51,15 @@ _PRIVATE_FIELDS = frozenset(
 
 
 class ElevenstAdapter(ChannelAdapter):
-    """Collect all read-only 11st order states as namespaced XML."""
+    """Collect the verified read-only 11st order feeds as namespaced XML."""
 
     def __init__(self, config: AppConfig, *, http: HttpClient | None = None) -> None:
         self._api_key = config.require("ELEVENST_API_KEY")
         self._http = http or HttpClient()
 
     def fetch(self, window: DateWindow) -> Iterator[ChannelRecord]:
-        start = window.start.strftime("%Y%m%d")
-        end = window.end.strftime("%Y%m%d")
+        start = window.start.strftime("%Y%m%d0000")
+        end = window.end.strftime("%Y%m%d2359")
         headers = {"Accept": "application/xml", "openapikey": self._api_key}
         records: dict[tuple[str, str], ChannelRecord] = {}
         precedence_by_identity: dict[tuple[str, str], int] = {}

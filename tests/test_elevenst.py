@@ -105,19 +105,33 @@ class ElevenstAdapterTests(unittest.TestCase):
         adapter = ElevenstAdapter(config(), http=http)
 
         self.assertEqual(list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))), [])
-        self.assertEqual(adapter.pages_fetched, 4)
+        self.assertEqual(adapter.pages_fetched, 2)
 
         self.assertEqual(len(http.calls), len(ORDER_ENDPOINTS))
         self.assertTrue(all(call[0] == "GET" for call in http.calls))
         self.assertTrue(all(call[2]["headers"] == {"Accept": "application/xml", "openapikey": "SYNTHETIC_ELEVENST_KEY"} for call in http.calls))
         self.assertEqual(
             [call[1] for call in http.calls],
-            [f"{endpoint}/20260810/20260810" for endpoint in ORDER_ENDPOINTS],
+            [f"{endpoint}/202608100000/202608102359" for endpoint in ORDER_ENDPOINTS],
+        )
+
+    def test_fetch_formats_each_window_bound_as_date_hour_minute(self):
+        http = FakeHttpClient()
+
+        list(
+            ElevenstAdapter(config(), http=http).fetch(
+                DateWindow(date(2026, 7, 31), date(2026, 8, 2))
+            )
+        )
+
+        self.assertEqual(
+            [call[1] for call in http.calls],
+            [f"{endpoint}/202607310000/202608022359" for endpoint in ORDER_ENDPOINTS],
         )
 
     def test_more_advanced_feed_replaces_duplicate_from_earlier_feed(self):
         http = FakeHttpClient(
-            ("elevenst_duplicate_complete.xml", "elevenst_empty.xml", "elevenst_empty.xml", "elevenst_duplicate_delivered.xml")
+            ("elevenst_duplicate_complete.xml", "elevenst_duplicate_delivered.xml")
         )
 
         records = list(ElevenstAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
