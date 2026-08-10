@@ -39,6 +39,44 @@ sql/channel_orders/060_verify_history_constraints.sql
 sql/channel_orders/090_verify_channel_order_tables.sql
 ```
 
+## Collector CLI
+
+Use Python 3.12 and install the exact runtime versions from `requirements.txt`.
+Configuration is loaded strictly from `.env` (or the file passed with
+`--config`). Use `.env.example` as the key-only template; API and database
+credentials are never accepted as command-line arguments.
+
+```powershell
+python -m pip install -r requirements.txt
+$env:PYTHONPATH = "src"
+python -m hmr_order_collection.cli list
+python -m hmr_order_collection.cli collect --channel naver --from 2026-08-10 --to 2026-08-10 --dry-run
+python -m hmr_order_collection.cli collect-all --to 2026-08-10 --maximum-window --dry-run --continue-on-error
+```
+
+Collection is a dry run by default. Database persistence is enabled only by
+the explicit `--write-db` flag. The CLI emits one JSON summary containing
+channel names, status, and counts; it never emits order records, exception
+messages, response bodies, PII, API credentials, or database credentials.
+Use `--continue-on-error` to attempt later channels after a channel failure.
+The process still exits nonzero when any channel fails.
+
+The initial maximum-window policy always ends on the explicit `--to` date:
+
+| Channel | Inclusive days | Current basis |
+|---|---:|---|
+| Naver SmartStore | 1 | changed-order endpoint limit |
+| Coupang | 31 | order-sheet endpoint limit |
+| Godomall | 1 | conservative pre-live boundary |
+| LotteON | 1 | adapter/API search limit |
+| 11st | 1 | conservative pre-live boundary |
+| SSG.COM | 180 | shipping-direction endpoint limit |
+| Toss Shopping | 31 | order endpoint limit |
+
+Godomall and 11st remain at a conservative one-day range until the controller
+performs the planned authenticated, read-only boundary checks after independent
+code review. Do not widen either range based only on HTTP status.
+
 생성 스크립트와 인덱스 스크립트는 두 번 실행해도 같은 객체를 중복 생성하지 않는다.
 
 ## 적재 트랜잭션

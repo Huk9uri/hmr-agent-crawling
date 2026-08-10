@@ -9,3 +9,8 @@ raw_responses/
 token-cache/
 token_cache/
 *.token-cache.json
+.uv-cache/
+collector-output/
+*.response-body
+__pycache__/
+*.py[cod]

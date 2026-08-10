@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
+from hmr_order_collection.config import AppConfig, ConfigurationError
 from hmr_order_collection.models import ChannelRecord
 
 
@@ -77,6 +78,36 @@ _SESSION_OPTIONS = (
     "SET NUMERIC_ROUNDABORT OFF",
     "SET XACT_ABORT ON",
 )
+
+
+def connect_from_config(
+    config: AppConfig,
+    *,
+    connector: Callable[..., Any] | None = None,
+) -> Any:
+    """Open SQL Server using only strict config values, never command arguments."""
+    if connector is None:
+        import pymssql
+
+        connector = pymssql.connect
+
+    raw_port = config.get("DB_PORT", "1433")
+    try:
+        port = int(raw_port) if raw_port is not None else 1433
+    except (TypeError, ValueError) as error:
+        raise ConfigurationError("DB_PORT must be an integer") from error
+    if not 1 <= port <= 65535:
+        raise ConfigurationError("DB_PORT must be between 1 and 65535")
+
+    return connector(
+        server=config.require("DB_SERVER"),
+        database=config.require("DB_NAME"),
+        user=config.require("DB_USER"),
+        password=config.require("DB_PASSWORD"),
+        port=port,
+        login_timeout=10,
+        timeout=60,
+    )
 
 
 class DatabaseWriter:
