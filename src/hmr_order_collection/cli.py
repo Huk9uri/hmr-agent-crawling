@@ -58,6 +58,9 @@ def _parser() -> argparse.ArgumentParser:
     _add_collection_options(collect_all)
     collect_all.add_argument("--maximum-window", action="store_true", required=True)
     collect_all.add_argument("--probe-boundaries", action="store_true")
+    collect_all.add_argument(
+        "--verified-maximum-days", action="append", default=[], metavar="CHANNEL=DAYS"
+    )
     return parser
 
 
@@ -84,14 +87,34 @@ def _validate_dates(start: date, end: date, today: date) -> None:
         raise CliUsageError("dates cannot be in the future")
 
 
+def _parse_verified_maximum_days(values: Sequence[str]) -> dict[str, int]:
+    allowed_caps = {
+        "godomall": BOUNDARY_PROBE_START_DAYS["godomall"],
+        "elevenst": BOUNDARY_PROBE_START_DAYS["elevenst"],
+    }
+    result: dict[str, int] = {}
+    for value in values:
+        try:
+            channel, raw_days = value.split("=", 1)
+            days = int(raw_days)
+            cap = allowed_caps[channel]
+        except (KeyError, TypeError, ValueError) as error:
+            raise CliUsageError("invalid verified maximum days") from error
+        if channel in result or not 1 <= days <= cap:
+            raise CliUsageError("invalid verified maximum days")
+        result[channel] = days
+    return result
+
+
 def _windows_for_channel(
     channel: str,
     *,
     start: date | None,
     end: date,
     maximum_window: bool,
+    verified_maximum_days: int | None = None,
 ) -> Iterable[DateWindow]:
-    maximum_days = MAXIMUM_WINDOW_DAYS[channel]
+    maximum_days = verified_maximum_days or MAXIMUM_WINDOW_DAYS[channel]
     if maximum_window:
         start = end - timedelta(days=maximum_days - 1)
     if start is None:
@@ -156,8 +179,11 @@ def _execute_channel(
     *,
     probe_boundary: bool,
     end: date,
+    applied_verified_maximum_days: int | None,
 ) -> dict[str, Any]:
     summary = _empty_summary(channel)
+    if applied_verified_maximum_days is not None:
+        summary["applied_verified_maximum_days"] = applied_verified_maximum_days
     starting_pages = adapter.pages_fetched
     try:
         records = (
@@ -213,6 +239,11 @@ def main(
         _validate_dates(start or end, end, today or date.today())
         if getattr(args, "probe_boundaries", False) and args.write_db:
             raise CliUsageError("boundary probing is dry-run only")
+        verified_maximum_days = _parse_verified_maximum_days(
+            getattr(args, "verified_maximum_days", [])
+        )
+        if getattr(args, "probe_boundaries", False) and verified_maximum_days:
+            raise CliUsageError("invalid verified maximum days")
     except CliUsageError as error:
         stderr.write(f"error: {error}\n")
         return 2
@@ -250,6 +281,7 @@ def main(
                     start=start,
                     end=end,
                     maximum_window=args.command == "collect-all",
+                    verified_maximum_days=verified_maximum_days.get(channel),
                 )
                 channel_summaries.append(
                     _execute_channel(
@@ -262,6 +294,9 @@ def main(
                             and channel in BOUNDARY_PROBE_START_DAYS
                         ),
                         end=end,
+                        applied_verified_maximum_days=verified_maximum_days.get(
+                            channel
+                        ),
                     )
                 )
             except ChannelRunFailure as error:

@@ -401,6 +401,120 @@ class CliTests(unittest.TestCase):
         self.assertEqual(error, "error: boundary probing is dry-run only\n")
         self.assertEqual(calls, {"config": 0, "registry": 0, "connection": 0})
 
+    def test_reviewed_probe_result_drives_subsequent_write_window(self):
+        probe_adapter = BoundaryAdapter(maximum_accepted_days=28, record_count=2)
+        probe_code, probe_output, probe_error, _calls, _writer, _connection = self.invoke(
+            [
+                "collect-all",
+                "--to",
+                "2026-08-10",
+                "--maximum-window",
+                "--probe-boundaries",
+            ],
+            adapters={"godomall": probe_adapter},
+        )
+        verified_days = probe_output["channels"][0]["verified_maximum_days"]
+
+        write_adapter = BoundaryAdapter(maximum_accepted_days=28, record_count=2)
+        write_code, write_output, write_error, calls, writer, connection = self.invoke(
+            [
+                "collect-all",
+                "--to",
+                "2026-08-10",
+                "--maximum-window",
+                "--verified-maximum-days",
+                f"godomall={verified_days}",
+                "--write-db",
+            ],
+            adapters={"godomall": write_adapter},
+        )
+
+        self.assertEqual((probe_code, probe_error), (0, ""))
+        self.assertEqual((write_code, write_error), (0, ""))
+        self.assertEqual(write_output["channels"][0]["applied_verified_maximum_days"], 28)
+        self.assertEqual(
+            write_adapter.windows,
+            [DateWindow(date(2026, 7, 14), date(2026, 8, 10))],
+        )
+        self.assertEqual(len(writer.calls), 1)
+        self.assertEqual(calls["connection"], 1)
+        self.assertTrue(connection.closed)
+
+    def test_verified_maximum_days_accepts_repeatable_reviewed_channel_values(self):
+        adapters = {
+            "godomall": BoundaryAdapter(maximum_accepted_days=31),
+            "elevenst": BoundaryAdapter(maximum_accepted_days=7),
+        }
+        code, output, error, _calls, _writer, _connection = self.invoke(
+            [
+                "collect-all",
+                "--to",
+                "2026-08-10",
+                "--maximum-window",
+                "--verified-maximum-days",
+                "godomall=31",
+                "--verified-maximum-days",
+                "elevenst=7",
+            ],
+            adapters=adapters,
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(error, "")
+        self.assertEqual(
+            [item["applied_verified_maximum_days"] for item in output["channels"]],
+            [31, 7],
+        )
+
+    def test_verified_maximum_days_rejects_unknown_fixed_duplicate_and_invalid_values(self):
+        cases = (
+            ["--verified-maximum-days", "unknown=1"],
+            ["--verified-maximum-days", "lotteon=1"],
+            ["--verified-maximum-days", "godomall=0"],
+            ["--verified-maximum-days", "godomall=32"],
+            ["--verified-maximum-days", "elevenst=8"],
+            ["--verified-maximum-days", "godomall=not-an-integer"],
+            [
+                "--verified-maximum-days",
+                "godomall=28",
+                "--verified-maximum-days",
+                "godomall=27",
+            ],
+        )
+        for options in cases:
+            with self.subTest(options=options):
+                code, output, error, calls, _writer, _connection = self.invoke(
+                    [
+                        "collect-all",
+                        "--to",
+                        "2026-08-10",
+                        "--maximum-window",
+                        *options,
+                    ]
+                )
+                self.assertEqual(code, 2)
+                self.assertIsNone(output)
+                self.assertEqual(error, "error: invalid verified maximum days\n")
+                self.assertEqual(
+                    calls, {"config": 0, "registry": 0, "connection": 0}
+                )
+
+    def test_verified_maximum_days_requires_maximum_window(self):
+        code, output, error, calls, _writer, _connection = self.invoke(
+            [
+                "collect-all",
+                "--to",
+                "2026-08-10",
+                "--verified-maximum-days",
+                "godomall=28",
+            ]
+        )
+
+        self.assertEqual(code, 2)
+        self.assertIsNone(output)
+        self.assertEqual(error, "error: invalid command arguments\n")
+        self.assertEqual(calls, {"config": 0, "registry": 0, "connection": 0})
+
     def test_continue_on_error_isolates_failures_and_summary_never_leaks_error_values(self):
         adapters = {
             "naver": FakeAdapter(error=RuntimeError("SECRET_TOKEN Alice 010-1234-5678")),

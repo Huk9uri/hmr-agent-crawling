@@ -107,3 +107,56 @@ the first independent review without performing operational calls.
 - GREEN: focused CLI/window/all-adapter suite passed 62 tests.
 - Full hash-locked Python 3.12 suite passed all 72 tests.
 - Live API and production DB verification remain deferred to the controller.
+
+## Fix round 2/5: reviewed probe handoff and strict period classification
+
+- Added repeatable `--verified-maximum-days channel=days` input for subsequent
+  `--maximum-window` runs. Only Godomall (1-31) and 11st (1-7) are accepted;
+  LotteON remains fixed at one day. Unknown, duplicate, malformed, and
+  out-of-range values fail before configuration or database construction.
+- The reviewed override changes the actual inclusive write window ending on
+  `--to` and is emitted as count-only `applied_verified_maximum_days` metadata.
+- Narrowed invalid-period classification to explicit date/search/query range
+  context plus invalid-width wording. Generic API rate-limit and quota-limit
+  messages referring to a current or billing period no longer cause a probe
+  reduction.
+- Added a two-command synthetic test that takes `verified_maximum_days: 28`
+  from a dry-run Godomall probe and applies exactly a 28-day window to the
+  subsequent `--write-db` invocation.
+
+### Exact verification commands and captured output
+
+RED command:
+
+```powershell
+uv run --offline --python 3.12 --with-requirements requirements.lock python -m unittest tests.test_cli tests.test_windows -v
+```
+
+```text
+Ran 30 tests in 0.063s
+FAILED (failures=10)
+```
+
+Focused GREEN command:
+
+```powershell
+uv run --offline --python 3.12 --with-requirements requirements.lock python -m unittest tests.test_cli tests.test_windows tests.test_godomall tests.test_lotteon tests.test_elevenst -v
+```
+
+```text
+Ran 45 tests in 0.105s
+OK
+```
+
+Full GREEN command:
+
+```powershell
+uv run --offline --python 3.12 --with-requirements requirements.lock python -m unittest -v
+```
+
+```text
+Ran 76 tests in 0.173s
+OK
+```
+
+No command in this fix round contacted a seller API or SQL Server.

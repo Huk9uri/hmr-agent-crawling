@@ -19,20 +19,40 @@ def explicit_invalid_period_message(message: object) -> bool:
     if not isinstance(message, str):
         return False
     normalized = " ".join(message.casefold().split())
-    english_period = any(
+    english_range = any(
+        marker in normalized for marker in ("date range", "search range", "query range")
+    )
+    english_width_rejection = any(
         marker in normalized
-        for marker in ("date range", "search range", "query period", "period")
+        for marker in (
+            "invalid",
+            "too long",
+            "too wide",
+            "exceed maximum",
+            "exceeds maximum",
+            "maximum width",
+            "maximum range",
+        )
     )
-    english_rejection = any(
+    korean_range = any(
         marker in normalized
-        for marker in ("invalid", "too long", "exceed", "maximum", "limit")
+        for marker in (
+            "조회기간",
+            "조회 기간",
+            "검색기간",
+            "검색 기간",
+            "날짜 범위",
+            "일자 범위",
+            "조회범위",
+            "검색범위",
+        )
     )
-    korean_period = "기간" in normalized
-    korean_rejection = any(
-        marker in normalized for marker in ("초과", "제한", "최대", "유효하지", "오류")
+    korean_width_rejection = any(
+        marker in normalized
+        for marker in ("초과", "최대 범위", "너무 깁", "유효하지")
     )
-    return (english_period and english_rejection) or (
-        korean_period and korean_rejection
+    return (english_range and english_width_rejection) or (
+        korean_range and korean_width_rejection
     )
 
 

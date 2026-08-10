@@ -55,6 +55,7 @@ python -m hmr_order_collection.cli list
 python -m hmr_order_collection.cli collect --channel naver --from 2026-08-10 --to 2026-08-10 --dry-run
 python -m hmr_order_collection.cli collect-all --to 2026-08-10 --maximum-window --dry-run --continue-on-error
 python -m hmr_order_collection.cli collect-all --to 2026-08-10 --maximum-window --probe-boundaries --dry-run --continue-on-error
+python -m hmr_order_collection.cli collect-all --to 2026-08-10 --maximum-window --verified-maximum-days godomall=28 --verified-maximum-days elevenst=7 --write-db --continue-on-error
 ```
 
 Regenerate the lock only as an intentional dependency update:
@@ -94,6 +95,15 @@ response; authentication, transport, parsing, and other business failures stop
 that channel without reduction. The JSON summary exposes `probe_attempts`,
 `probe_invalid_periods`, `verified_maximum_days`, and `pages` as count-only
 metadata. LotteON is never queried above one day.
+
+After reviewing a successful probe summary, pass each approved Godomall or 11st
+value to the later maximum-window command with repeatable
+`--verified-maximum-days channel=days` options. The write summary includes
+`applied_verified_maximum_days` for that channel. Godomall values must be 1-31
+and 11st values 1-7. LotteON is fixed at one day and cannot be overridden;
+unknown channels, duplicate entries, malformed integers, and out-of-range
+values fail before configuration is loaded. Never copy an unreviewed value from
+an unsuccessful or partial probe.
 
 생성 스크립트와 인덱스 스크립트는 두 번 실행해도 같은 객체를 중복 생성하지 않는다.
 

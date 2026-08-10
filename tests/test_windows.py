@@ -8,6 +8,23 @@ class DateWindowTests(unittest.TestCase):
     def test_only_explicit_period_rejection_messages_are_classified_for_probe_reduction(self):
         self.assertTrue(explicit_invalid_period_message("조회기간이 최대 범위를 초과했습니다"))
         self.assertTrue(explicit_invalid_period_message("Invalid date range: period too long"))
+        self.assertTrue(explicit_invalid_period_message("Search range exceeds maximum width"))
+        self.assertTrue(explicit_invalid_period_message("Query date range is too wide"))
+        self.assertFalse(
+            explicit_invalid_period_message(
+                "API request limit exceeded for the current period"
+            )
+        )
+        self.assertFalse(
+            explicit_invalid_period_message(
+                "Quota limit exceeded for the current billing period"
+            )
+        )
+        self.assertFalse(
+            explicit_invalid_period_message(
+                "현재 기간의 API 요청 제한을 초과했습니다"
+            )
+        )
         self.assertFalse(explicit_invalid_period_message("authentication failed"))
         self.assertFalse(explicit_invalid_period_message("temporary server error"))
 
