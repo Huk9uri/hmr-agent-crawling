@@ -65,6 +65,29 @@ class InMemoryHistoryCursor:
         pass
 
 
+class PymssqlLikeConnection(InMemoryHistoryConnection):
+    """Models pymssql's connection-owned transaction under autocommit=False."""
+
+    def __init__(self):
+        super().__init__()
+        self.transaction_depth = 1
+
+    def cursor(self):
+        self._pending = copy.deepcopy(self.rows)
+        return PymssqlLikeCursor(self)
+
+    def commit(self):
+        if self.transaction_depth == 1:
+            super().commit()
+
+
+class PymssqlLikeCursor(InMemoryHistoryCursor):
+    def execute(self, sql, parameters=()):
+        if sql == "BEGIN TRANSACTION":
+            self.connection.transaction_depth += 1
+        super().execute(sql, parameters)
+
+
 def record(order_no="ORDER-1", item_sno="ITEM-1", payload_hash=b"a" * 32, **columns):
     return ChannelRecord(
         identity=(order_no, item_sno),
@@ -89,6 +112,15 @@ class DatabaseWriterTests(unittest.TestCase):
         self.assertEqual([(row["identity"], row["is_latest"]) for row in connection.rows], [(("ORDER-1", "ITEM-1"), True)])
         self.assertEqual(connection.commit_count, 1)
         self.assertIn("SET ANSI_NULLS ON", [sql for sql, _ in connection.executed])
+
+    def test_write_commits_the_connection_owned_transaction_without_nesting(self):
+        connection = PymssqlLikeConnection()
+
+        summary = self.writer(connection).write("godomall", [record()], self.run_id)
+
+        self.assertEqual(summary.inserted, 1)
+        self.assertEqual(len(connection.rows), 1)
+        self.assertEqual(connection.commit_count, 1)
 
     def test_unchanged_payload_skips_history_insert(self):
         connection = InMemoryHistoryConnection(

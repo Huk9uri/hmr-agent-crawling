@@ -130,7 +130,6 @@ class DatabaseWriter:
         try:
             for statement in _SESSION_OPTIONS:
                 cursor.execute(statement)
-            cursor.execute("BEGIN TRANSACTION")
             collected_at = self._utc_now()
             for record in validated_records:
                 latest_hash = self._locked_latest_hash(cursor, definition, record.identity)
