@@ -1,0 +1,50 @@
+{
+  "resultCode": "00",
+  "resultMessage": "SUCCESS",
+  "resultDesc": "synthetic success",
+  "shppDirections": [
+    {
+      "shppDirection": {
+        "ordNo": "SSG-ORDER-001",
+        "ordItemSeq": 2,
+        "shppNo": "SSG-SHIPPING-001",
+        "shppSeq": "3",
+        "siteNo": "6005",
+        "itemId": "SSG-ITEM-001",
+        "uitemId": "SSG-UNIT-001",
+        "splVenItemId": "SSG-VENDOR-ITEM-001",
+        "uSplVenItemId": "SSG-VENDOR-UNIT-001",
+        "itemNm": "Synthetic meal kit",
+        "uitemNm": "Two portions",
+        "ordQty": 4,
+        "dircItemQty": 3,
+        "cnclItemQty": 1,
+        "splprc": 10000,
+        "sellprc": 12500,
+        "rlordAmt": 11800,
+        "dcAmt": 700,
+        "ordStatCd": "120",
+        "shppStatCd": "10",
+        "shppProgStatDtlCd": "11",
+        "ordRcpDts": "2026-08-09 10:00:00",
+        "ordCmplDts": "2026-08-09 10:01:00",
+        "shppRsvtDt": "2026-08-10",
+        "ordShpplocId": "SYNTHETIC_SSG_ADDRESS_ID_TO_MASK",
+        "ordpeNm": "SYNTHETIC_SSG_ORDERER_NAME_TO_MASK",
+        "ordpeHpno": "SYNTHETIC_SSG_ORDERER_PHONE_TO_MASK",
+        "rcptpeNm": "SYNTHETIC_SSG_RECEIVER_NAME_TO_MASK",
+        "rcptpeHpno": "SYNTHETIC_SSG_RECEIVER_MOBILE_TO_MASK",
+        "rcptpeTelno": "SYNTHETIC_SSG_RECEIVER_TEL_TO_MASK",
+        "shpplocAddr": "SYNTHETIC_SSG_LAND_ADDRESS_TO_MASK",
+        "shpplocZipcd": "SYNTHETIC_SSG_ZIP_TO_MASK",
+        "shpplocOldZipcd": "SYNTHETIC_SSG_OLD_ZIP_TO_MASK",
+        "ordpeRoadAddr": "SYNTHETIC_SSG_ROAD_ADDRESS_TO_MASK",
+        "shpplocBascAddr": "SYNTHETIC_SSG_BASE_ADDRESS_TO_MASK",
+        "shpplocDtlAddr": "SYNTHETIC_SSG_DETAIL_ADDRESS_TO_MASK",
+        "pCus": "SYNTHETIC_SSG_CUSTOMS_TO_MASK",
+        "mbrLoginId": "SYNTHETIC_SSG_MEMBER_ID_TO_MASK",
+        "ordMemoCntt": "SYNTHETIC_SSG_CUSTOMER_MEMO_TO_MASK"
+      }
+    }
+  ]
+}
