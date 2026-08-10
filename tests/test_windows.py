@@ -10,6 +10,29 @@ class DateWindowTests(unittest.TestCase):
         self.assertTrue(explicit_invalid_period_message("Invalid date range: period too long"))
         self.assertTrue(explicit_invalid_period_message("Search range exceeds maximum width"))
         self.assertTrue(explicit_invalid_period_message("Query date range is too wide"))
+        self.assertTrue(explicit_invalid_period_message("검색 기간이 너무 깁니다"))
+        self.assertFalse(explicit_invalid_period_message("Invalid date range format"))
+        self.assertFalse(
+            explicit_invalid_period_message(
+                "Invalid date range: start date must be before end date"
+            )
+        )
+        self.assertFalse(
+            explicit_invalid_period_message(
+                "Date range start is after the end"
+            )
+        )
+        self.assertFalse(
+            explicit_invalid_period_message("조회기간 형식이 유효하지 않습니다")
+        )
+        self.assertFalse(
+            explicit_invalid_period_message(
+                "조회기간 시작일은 종료일보다 이전이어야 합니다"
+            )
+        )
+        self.assertFalse(
+            explicit_invalid_period_message("검색기간 날짜 형식 오류")
+        )
         self.assertFalse(
             explicit_invalid_period_message(
                 "API request limit exceeded for the current period"

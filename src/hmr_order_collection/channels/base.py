@@ -25,7 +25,6 @@ def explicit_invalid_period_message(message: object) -> bool:
     english_width_rejection = any(
         marker in normalized
         for marker in (
-            "invalid",
             "too long",
             "too wide",
             "exceed maximum",
@@ -49,7 +48,7 @@ def explicit_invalid_period_message(message: object) -> bool:
     )
     korean_width_rejection = any(
         marker in normalized
-        for marker in ("초과", "최대 범위", "너무 깁", "유효하지")
+        for marker in ("초과", "최대 범위", "너무 깁")
     )
     return (english_range and english_width_rejection) or (
         korean_range and korean_width_rejection

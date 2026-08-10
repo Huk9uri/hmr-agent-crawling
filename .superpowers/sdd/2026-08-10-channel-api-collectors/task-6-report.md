@@ -160,3 +160,48 @@ OK
 ```
 
 No command in this fix round contacted a seller API or SQL Server.
+
+## Fix round 3/5: reject non-width date errors
+
+Removed generic English `invalid` and Korean `유효하지` markers from the
+maximum-width classifier. Invalid date formats, start-after-end errors, and
+their Korean equivalents now stop the channel without reducing/retrying the
+candidate. Explicit `too long`, `too wide`, `exceeds maximum`, `maximum width`,
+and Korean maximum-width messages remain positive probe signals.
+
+### Exact verification commands and captured output
+
+RED command:
+
+```powershell
+uv run --offline --python 3.12 --with-requirements requirements.lock python -m unittest tests.test_windows.DateWindowTests.test_only_explicit_period_rejection_messages_are_classified_for_probe_reduction -v
+```
+
+```text
+Ran 1 test in 0.002s
+FAILED (failures=1)
+```
+
+Focused GREEN command:
+
+```powershell
+uv run --offline --python 3.12 --with-requirements requirements.lock python -m unittest tests.test_windows tests.test_godomall tests.test_lotteon tests.test_elevenst -v
+```
+
+```text
+Ran 21 tests in 0.034s
+OK
+```
+
+Full GREEN command:
+
+```powershell
+uv run --offline --python 3.12 --with-requirements requirements.lock python -m unittest -v
+```
+
+```text
+Ran 76 tests in 0.130s
+OK
+```
+
+No command in this fix round contacted a seller API or SQL Server.
