@@ -84,6 +84,39 @@ class LotteonAdapterTests(unittest.TestCase):
         self.assertNotIn("SYNTHETIC_NAME_TO_MASK", record.raw_json)
         self.assertNotIn("SYNTHETIC_ORDERER_TO_MASK", record.raw_json)
 
+    def test_fetch_rejects_null_or_blank_order_and_item_identity_components(self):
+        malformed_rows = (
+            {"odNo": None, "odSeq": "1"},
+            {"odNo": "", "odSeq": "1"},
+            {"odNo": "   ", "odSeq": "1"},
+            {"odNo": "ORDER-1", "odSeq": None},
+            {"odNo": "ORDER-1", "odSeq": ""},
+            {"odNo": "ORDER-1", "odSeq": "   "},
+        )
+        for malformed_row in malformed_rows:
+            with self.subTest(row=malformed_row):
+                class IdentityHttpClient:
+                    def request(self, method, url, **kwargs):
+                        payload = {
+                            "returnCode": "0000",
+                            "data": {
+                                "deliveryOrderList": [malformed_row]
+                                if url == DELIVERY_ORDERS_URL
+                                else [],
+                                "deliveryProgressStateList": [],
+                            },
+                        }
+                        result = requests.Response()
+                        result.status_code = 200
+                        result.url = url
+                        result._content = json.dumps(payload).encode("utf-8")
+                        return result
+
+                adapter = LotteonAdapter(config(), http=IdentityHttpClient())
+
+                with self.assertRaisesRegex(ValueError, "identity"):
+                    list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
+
     def test_rejects_the_documented_more_than_one_day_window_before_http(self):
         http = FakeHttpClient({})
         with self.assertRaisesRegex(ValueError, "1 day"):

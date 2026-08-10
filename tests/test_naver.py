@@ -118,7 +118,7 @@ class NaverAdapterTests(unittest.TestCase):
         self.assertEqual([len(call[2]["json"]["productOrderIds"]) for call in detail_calls], [300, 1])
         self.assertTrue(all(call[2]["json"]["quantityClaimCompatibility"] for call in detail_calls))
 
-    def test_repeated_more_pair_stops_continuation_loop(self):
+    def test_repeated_more_pair_raises_sanitized_continuation_failure(self):
         page_count = 0
 
         def handler(method, url, kwargs):
@@ -137,9 +137,36 @@ class NaverAdapterTests(unittest.TestCase):
 
         adapter = NaverAdapter(config(), http=FakeHttpClient(handler), clock_ms=lambda: 1643961623299)
 
-        list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
+        with self.assertRaisesRegex(ValueError, "Naver continuation cursor was repeated"):
+            list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
         self.assertEqual(page_count, 2)
+
+    def test_fetch_rejects_null_or_blank_product_order_identity(self):
+        for malformed_identity in (None, "", "   "):
+            with self.subTest(identity=malformed_identity):
+                changed = {"data": {"lastChangeStatuses": [{"productOrderId": "FETCHED-ID"}]}}
+                detail = {
+                    "data": [
+                        {
+                            "order": {},
+                            "productOrder": {"productOrderId": malformed_identity},
+                            "delivery": {},
+                        }
+                    ]
+                }
+
+                def handler(method, url, kwargs):
+                    if url.endswith("/oauth2/token"):
+                        return {"access_token": "SYNTHETIC_ACCESS_TOKEN"}
+                    return changed if url.endswith("/last-changed-statuses") else detail
+
+                adapter = NaverAdapter(
+                    config(), http=FakeHttpClient(handler), clock_ms=lambda: 1643961623299
+                )
+
+                with self.assertRaisesRegex(ValueError, "identity"):
+                    list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
     def test_detail_maps_only_deployed_columns_and_masks_raw_payload(self):
         changed = fixture("naver_changed_page.json")

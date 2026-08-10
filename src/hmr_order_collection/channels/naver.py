@@ -132,7 +132,7 @@ class NaverAdapter(ChannelAdapter):
                 break
             continuation = (more_from, more_sequence)
             if continuation in seen_continuations:
-                break
+                raise ValueError("Naver continuation cursor was repeated")
             seen_continuations.add(continuation)
             params["lastChangedFrom"] = more_from
             params["moreSequence"] = more_sequence
@@ -143,7 +143,10 @@ def _map_record(detail: dict[str, Any]) -> ChannelRecord:
     order = detail.get("order") or {}
     product_order = detail.get("productOrder") or {}
     delivery = detail.get("delivery") or {}
-    product_order_id = str(product_order["productOrderId"])
+    raw_product_order_id = product_order.get("productOrderId")
+    if raw_product_order_id is None or not str(raw_product_order_id).strip():
+        raise ValueError("Naver row lacked product-order identity")
+    product_order_id = str(raw_product_order_id)
     order_status = product_order.get("productOrderStatus")
     delivery_status = delivery.get("deliveryStatus")
     columns = {

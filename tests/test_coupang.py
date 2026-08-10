@@ -70,7 +70,7 @@ class CoupangAdapterTests(unittest.TestCase):
             "signature=0416af616b4141adc4f85ccb20874c3d3d29391f146715fed2c15d294cb81647",
         )
 
-    def test_fetch_queries_all_statuses_and_stops_a_repeated_next_token(self):
+    def test_fetch_raises_sanitized_failure_for_a_repeated_next_token(self):
         pages_by_status = {status: 0 for status in ORDER_STATUSES}
 
         def handler(method, url, kwargs):
@@ -83,15 +83,36 @@ class CoupangAdapterTests(unittest.TestCase):
         http = FakeHttpClient(handler)
         adapter = CoupangAdapter(config(), http=http, clock=lambda: NOW)
 
-        records = list(adapter.fetch(DateWindow(date(2026, 8, 1), date(2026, 8, 10))))
+        with self.assertRaisesRegex(ValueError, "Coupang continuation cursor was repeated"):
+            list(adapter.fetch(DateWindow(date(2026, 8, 1), date(2026, 8, 10))))
 
-        self.assertEqual(records, [])
-        self.assertEqual(adapter.pages_fetched, 7)
-        self.assertEqual(pages_by_status, {"ACCEPT": 2, "INSTRUCT": 1, "DEPARTURE": 1, "DELIVERING": 1, "FINAL_DELIVERY": 1, "NONE_TRACKING": 1})
+        self.assertEqual(adapter.pages_fetched, 2)
+        self.assertEqual(pages_by_status, {"ACCEPT": 2, "INSTRUCT": 0, "DEPARTURE": 0, "DELIVERING": 0, "FINAL_DELIVERY": 0, "NONE_TRACKING": 0})
         self.assertEqual(http.calls[0][2]["params"], {"createdAtFrom": "2026-08-01+09:00", "createdAtTo": "2026-08-10+09:00", "maxPerPage": 50, "status": "ACCEPT"})
         self.assertEqual(http.calls[1][2]["params"]["nextToken"], "SAME-TOKEN")
         self.assertTrue(all(call[0] == "GET" for call in http.calls))
         self.assertTrue(all(call[2]["headers"]["X-Requested-By"] == "SYNTHETIC_VENDOR" for call in http.calls))
+
+    def test_fetch_rejects_null_or_blank_shipment_and_item_identity_components(self):
+        malformed_rows = (
+            {"shipmentBoxId": None, "orderItems": [{"sequenceNo": "1"}]},
+            {"shipmentBoxId": "", "orderItems": [{"sequenceNo": "1"}]},
+            {"shipmentBoxId": "   ", "orderItems": [{"sequenceNo": "1"}]},
+            {"shipmentBoxId": "SHIPMENT-1", "orderItems": [{"sequenceNo": None}]},
+            {"shipmentBoxId": "SHIPMENT-1", "orderItems": [{"sequenceNo": ""}]},
+            {"shipmentBoxId": "SHIPMENT-1", "orderItems": [{"sequenceNo": "   "}]},
+        )
+        for malformed_row in malformed_rows:
+            with self.subTest(row=malformed_row):
+                def handler(method, url, kwargs):
+                    if kwargs["params"]["status"] == "ACCEPT":
+                        return {"code": 200, "data": [malformed_row]}
+                    return fixture("coupang_empty_page.json")
+
+                adapter = CoupangAdapter(config(), http=FakeHttpClient(handler), clock=lambda: NOW)
+
+                with self.assertRaisesRegex(ValueError, "identity"):
+                    list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
     def test_order_item_maps_only_deployed_columns_and_masks_raw_payload(self):
         order_page = fixture("coupang_orders_page.json")

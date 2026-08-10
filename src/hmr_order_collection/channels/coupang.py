@@ -87,7 +87,7 @@ class CoupangAdapter(ChannelAdapter):
                     break
                 token = str(next_token)
                 if token in seen_tokens:
-                    break
+                    raise ValueError("Coupang continuation cursor was repeated")
                 seen_tokens.add(token)
                 params["nextToken"] = token
 
@@ -119,10 +119,16 @@ class CoupangAdapter(ChannelAdapter):
 
 
 def _shipment_records(shipment: dict[str, Any]) -> Iterator[ChannelRecord]:
-    shipment_box_id = str(shipment["shipmentBoxId"])
+    raw_shipment_box_id = shipment.get("shipmentBoxId")
+    if raw_shipment_box_id is None or not str(raw_shipment_box_id).strip():
+        raise ValueError("Coupang row lacked shipment/item identity")
+    shipment_box_id = str(raw_shipment_box_id)
     order_status = shipment.get("status")
     for item in shipment.get("orderItems") or []:
-        order_item_id = str(item["sequenceNo"])
+        raw_order_item_id = item.get("sequenceNo")
+        if raw_order_item_id is None or not str(raw_order_item_id).strip():
+            raise ValueError("Coupang row lacked shipment/item identity")
+        order_item_id = str(raw_order_item_id)
         columns = {
             "ShipmentBoxId": shipment_box_id,
             "OrderId": _optional_str(shipment.get("orderId")),

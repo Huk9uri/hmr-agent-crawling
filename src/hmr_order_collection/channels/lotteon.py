@@ -112,10 +112,14 @@ class LotteonAdapter(ChannelAdapter):
 
 
 def _identity(row: dict[str, Any]) -> tuple[str, str]:
-    try:
-        return str(row["odNo"]), str(row["odSeq"])
-    except KeyError as error:
-        raise ValueError("LotteON row lacked order/item identity") from error
+    order_no = row.get("odNo")
+    order_item_seq = row.get("odSeq")
+    if any(
+        value is None or not str(value).strip()
+        for value in (order_no, order_item_seq)
+    ):
+        raise ValueError("LotteON row lacked order/item identity")
+    return str(order_no), str(order_item_seq)
 
 
 def _map_record(order: dict[str, Any], progress: dict[str, Any] | None) -> ChannelRecord:
