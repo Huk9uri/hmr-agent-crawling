@@ -298,7 +298,7 @@ GET  https://shopping-fep.toss.im/api/v3/shopping-fep/orders/v2
 
 ### 판정
 
-토스쇼핑은 공식 Open API를 통해 한촌몰의 주문상품·금액·배송 데이터를 직접 자동 수집할 수 있다. 토큰은 실제 유효시간을 기준으로 만료 전에 자동 갱신하고, 채널별 저장 테이블은 `stg.TossShoppingOrderItem`으로 구성한다.
+토스쇼핑은 공식 Open API를 통해 한촌몰의 주문상품·금액·배송 데이터를 직접 자동 수집할 수 있다. 토큰은 실제 유효시간을 기준으로 만료 전에 자동 갱신하고, 채널별 저장 테이블은 `dbo.TOSS_SHOPPING_ORDER_ITEM`으로 구성한다.
 
 ## 15. 한촌몰 고도몰 Open API 검증 결과
 

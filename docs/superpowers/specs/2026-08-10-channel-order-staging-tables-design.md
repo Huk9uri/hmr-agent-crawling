@@ -1,4 +1,4 @@
-# 채널별 주문상품 스테이징 테이블 설계
+# 채널별 주문상품 원본 테이블 설계
 
 - 작성일: 2026-08-10
 - 대상 DBMS: Microsoft SQL Server (SSMS)
@@ -6,7 +6,7 @@
 
 ## 1. 목적
 
-판매채널마다 서로 다른 주문 API 응답을 손실 없이 저장하면서, 후속 단계에서 공통 주문·상품·배송 모델과 대시보드 VIEW로 변환할 수 있는 채널별 스테이징 영역을 구축한다.
+판매채널마다 서로 다른 주문 API 응답을 손실 없이 저장하면서, 후속 단계에서 공통 주문·상품·배송 모델과 대시보드 VIEW로 변환할 수 있는 채널별 원본 저장 영역을 구축한다. 논리적 역할은 스테이징이지만 기존 `ecommerce` 데이터베이스 관례에 맞춰 별도 `stg` 스키마를 만들지 않고 `dbo` 스키마를 사용한다.
 
 이번 구현은 채널별 테이블까지만 포함한다. 공통 `core` 테이블, 수집 실행 이력 테이블, 원본 응답 전용 테이블 및 대시보드 VIEW는 후속 구현 범위다.
 
@@ -14,13 +14,15 @@
 
 실제 운영 API 호출이 검증된 다음 7개 채널을 구현한다.
 
-1. `stg.NaverSmartStoreOrderItem`
-2. `stg.GodomallOrderItem`
-3. `stg.CoupangOrderItem`
-4. `stg.LotteOnOrderItem`
-5. `stg.ElevenStreetOrderItem`
-6. `stg.SsgOrderItem`
-7. `stg.TossShoppingOrderItem`
+1. `dbo.NAVER_SMARTSTORE_ORDER_ITEM`
+2. `dbo.GODOMALL_ORDER_ITEM`
+3. `dbo.COUPANG_ORDER_ITEM`
+4. `dbo.LOTTEON_ORDER_ITEM`
+5. `dbo.ELEVENST_ORDER_ITEM`
+6. `dbo.SSG_ORDER_ITEM`
+7. `dbo.TOSS_SHOPPING_ORDER_ITEM`
+
+테이블명은 모두 영문 대문자 스네이크 케이스로 작성한다. `ELEVENST`는 숫자로 시작하는 객체명과 대괄호 의존을 피하기 위한 11번가 영문 식별자다.
 
 CJ온스타일, 지마켓·옥션 ESM 및 알리익스프레스는 인증 승인이 완료되고 실제 응답을 확인한 뒤 별도 테이블로 추가한다.
 
@@ -132,7 +134,7 @@ Shipment Box·Order·Order Item 식별자, 벤더 상품·옵션 ID, 수량·취
 
 ## 10. 구현 산출물
 
-- `sql/staging/001_create_stg_schema.sql`
+- `sql/staging/001_database_prerequisites.sql`
 - `sql/staging/010_create_channel_order_item_tables.sql`
 - `sql/staging/020_create_channel_order_item_indexes.sql`
 - `sql/staging/090_verify_channel_order_item_tables.sql`
