@@ -23,7 +23,8 @@ class HttpResponseError(RuntimeError):
 
 def _safe_url(url: str) -> str:
     parts = urlsplit(url)
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+    host = parts.netloc.rsplit("@", 1)[-1]
+    return urlunsplit((parts.scheme, host, parts.path, "", ""))
 
 
 def _is_retryable_status(status_code: int) -> bool:
@@ -68,7 +69,9 @@ class HttpClient:
                 response = self._session.request(method, url, **kwargs)
             except requests.RequestException as error:
                 if attempt == self._max_attempts:
-                    raise HttpResponseError(f"Request failed for {method.upper()} {url}") from error
+                    raise HttpResponseError(
+                        f"Request failed for {method.upper()} {_safe_url(url)}"
+                    ) from None
                 self._sleep(attempt)
                 continue
             if _is_retryable_status(response.status_code) and attempt < self._max_attempts:
