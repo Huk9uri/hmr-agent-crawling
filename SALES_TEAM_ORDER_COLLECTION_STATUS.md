@@ -385,7 +385,23 @@ Body: requestShppDirection (perdType=02, 시작일, 종료일)
 
 **현재 판단: 공식 API는 존재하지만 한국 판매자 계정의 직접개발 권한과 화이트리스트 승인이 필요하므로, 기술지원 회신 및 실제 API 호출 전까지 수집 가능 확정 채널에는 포함하지 않는다.**
 
-## 18. 참고 자료
+## 18. SQL Server 채널별 주문상품 테이블 구현
+
+실제 API 호출이 검증된 7개 채널에 대해 `dbo` 영문 테이블 DDL을 작성했다.
+
+- `dbo.NAVER_SMARTSTORE_ORDER_ITEM`
+- `dbo.GODOMALL_ORDER_ITEM`
+- `dbo.COUPANG_ORDER_ITEM`
+- `dbo.LOTTEON_ORDER_ITEM`
+- `dbo.ELEVENST_ORDER_ITEM`
+- `dbo.SSG_ORDER_ITEM`
+- `dbo.TOSS_SHOPPING_ORDER_ITEM`
+
+각 행은 주문상품 한 건의 한 시점 상태이며, 상태 변경 시 이력을 추가하고 주문상품별 최신 행만 `IsLatest = 1`로 유지한다. 마스킹 JSON 유효성, 최신 행 유일성, 수집 실행 및 페이로드 해시 인덱스 검증 스크립트를 함께 제공한다.
+
+현재는 SQL 파일 구현 단계이며 실제 `ecommerce` 데이터베이스 배포는 아직 수행하지 않았다.
+
+## 19. 참고 자료
 
 - [네이버 커머스 API](https://apicenter.commerce.naver.com/docs/commerce-api/current)
 - [네이버페이 주문형 가맹점 API 기술지원](https://github.com/npay-mall-order-api/merchant-order-api)
