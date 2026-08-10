@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="EUC-KR"?>
+<ord:orders xmlns:ord="http://api.11st.co.kr/schema/order">
+  <ord:order>
+    <ord:orderNo>ELEVENST-EUC-KR-ORDER-001</ord:orderNo>
+    <ord:orderProducts>
+      <ord:orderProduct>
+        <ord:orderProductNo>ELEVENST-EUC-KR-ITEM-001</ord:orderProductNo>
+        <ord:productName>합성 김치볶음밥</ord:productName>
+        <ord:quantity>1</ord:quantity>
+      </ord:orderProduct>
+    </ord:orderProducts>
+  </ord:order>
+</ord:orders>

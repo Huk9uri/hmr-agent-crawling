@@ -205,3 +205,52 @@ OK
 ```
 
 No command in this fix round contacted a seller API or SQL Server.
+
+## Live compatibility fix (round 4/5): 11st EUC-KR XML and SSG empty sentinel
+
+- Added a synthetic namespaced 11st XML fixture containing Korean text. The
+  test encodes it as declared EUC-KR wire bytes and proves the adapter returns
+  the decoded Korean product name. XML declarations are now decoded with their
+  declared codec before `ElementTree` parsing; UTF-8 and namespace behavior
+  remains covered by the existing suite, and decoding/parsing failures remain
+  body-free `HttpResponseError` instances.
+- Accepted blank-string entries in a successful SSG `shppDirections` list as
+  empty-response sentinels. Nonblank strings remain malformed-response errors.
+
+### Exact verification commands and captured output
+
+RED command:
+
+```powershell
+uv run --offline --python 3.12 --with-requirements requirements.lock python -m unittest tests.test_elevenst.ElevenstAdapterTests.test_fetch_decodes_euc_kr_declared_namespaced_xml_bytes tests.test_ssg.SsgAdapterTests.test_fetch_treats_blank_string_shipping_direction_sentinel_as_empty tests.test_ssg.SsgAdapterTests.test_fetch_rejects_nonblank_string_shipping_direction_sentinel -v
+```
+
+```text
+Ran 3 tests in 0.013s
+FAILED (failures=2)
+```
+
+Focused GREEN command:
+
+```powershell
+uv run --offline --python 3.12 --with-requirements requirements.lock python -m unittest tests.test_http tests.test_elevenst tests.test_ssg -v
+```
+
+```text
+Ran 14 tests in 0.025s
+OK
+```
+
+Full hash-locked GREEN command:
+
+```powershell
+uv run --offline --python 3.12 --with-requirements requirements.lock python -m unittest -v
+```
+
+```text
+Ran 79 tests in 0.116s
+OK
+```
+
+No command in this fix round contacted a seller API or SQL Server, and no
+`.env` file was read.

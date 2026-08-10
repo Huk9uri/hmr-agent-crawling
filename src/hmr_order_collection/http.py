@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import re
 import time
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -15,6 +16,11 @@ CONNECT_TIMEOUT_SECONDS = 10
 READ_TIMEOUT_SECONDS = 60
 DEFAULT_TIMEOUT = (CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS)
 RETRYABLE_STATUS_CODES = frozenset({429})
+_XML_DECLARED_ENCODING = re.compile(
+    br"^\s*<\?xml\s+[^>]*\bencoding\s*=\s*['\"]"
+    br"(?P<encoding>[A-Za-z][A-Za-z0-9._-]*)['\"]",
+    re.IGNORECASE,
+)
 
 
 class HttpResponseError(RuntimeError):
@@ -42,8 +48,13 @@ def parse_json(response: requests.Response) -> Any:
 def parse_xml(response: requests.Response) -> ElementTree.Element:
     """Decode XML while deliberately withholding a malformed response body."""
     try:
-        return ElementTree.fromstring(response.content)
-    except ElementTree.ParseError as error:
+        content = response.content
+        declaration = _XML_DECLARED_ENCODING.match(content)
+        if declaration is not None:
+            encoding = declaration.group("encoding").decode("ascii")
+            content = content.decode(encoding)
+        return ElementTree.fromstring(content)
+    except (ElementTree.ParseError, LookupError, ValueError) as error:
         raise HttpResponseError(f"Invalid XML response from {_safe_url(response.url)}") from error
 
 

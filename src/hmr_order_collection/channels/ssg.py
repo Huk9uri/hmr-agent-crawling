@@ -81,6 +81,8 @@ def _shipping_directions(value: Any) -> list[dict[str, Any]]:
     candidates = value if isinstance(value, list) else [value]
     rows: list[dict[str, Any]] = []
     for candidate in candidates:
+        if isinstance(candidate, str) and not candidate.strip():
+            continue
         if not isinstance(candidate, dict):
             raise ValueError("SSG shipping-direction list was malformed")
         nested = candidate.get("shppDirection", candidate)

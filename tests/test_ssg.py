@@ -43,6 +43,38 @@ def config():
 
 
 class SsgAdapterTests(unittest.TestCase):
+    def test_fetch_treats_blank_string_shipping_direction_sentinel_as_empty(self):
+        payload = {
+            "resultCode": "00",
+            "resultMessage": "SUCCESS",
+            "shppDirections": [""],
+        }
+        adapter = SsgAdapter(config(), http=FakeHttpClient(payload))
+
+        try:
+            records = list(
+                adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))
+            )
+        except ValueError as error:
+            self.fail(f"blank SSG shipping-direction sentinel was rejected: {error}")
+
+        self.assertEqual(records, [])
+        self.assertEqual(adapter.pages_fetched, 1)
+
+    def test_fetch_rejects_nonblank_string_shipping_direction_sentinel(self):
+        payload = {
+            "resultCode": "00",
+            "resultMessage": "SUCCESS",
+            "shppDirections": ["synthetic malformed row"],
+        }
+
+        with self.assertRaisesRegex(ValueError, "list was malformed"):
+            list(
+                SsgAdapter(config(), http=FakeHttpClient(payload)).fetch(
+                    DateWindow(date(2026, 8, 10), date(2026, 8, 10))
+                )
+            )
+
     def test_fetch_posts_order_completion_window_and_maps_only_deployed_columns(self):
         http = FakeHttpClient(fixture("ssg_shipping_directions.json"))
         adapter = SsgAdapter(config(), http=http)
