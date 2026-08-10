@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <header>
+    <code>000</code>
+    <msg>SUCCESS</msg>
+    <lastOrder>true</lastOrder>
+  </header>
+  <return>
+    <order_data>
+      <orderNo>GODO-ORDER-002</orderNo>
+      <orderChannelFl>naverpay</orderChannelFl>
+      <apiOrderNo>GODO-EXTERNAL-002</apiOrderNo>
+      <orderStatus>g1</orderStatus>
+      <orderDate>2026-08-10 11:00:00</orderDate>
+      <paymentDt>2026-08-10 11:01:00</paymentDt>
+      <settlePrice>23800</settlePrice>
+      <totalGoodsDcPrice>1200</totalGoodsDcPrice>
+      <totalDeliveryCharge>3000</totalDeliveryCharge>
+      <orderInfoData>
+        <orderName>SYNTHETIC_NAME_TO_MASK</orderName>
+        <orderEmail>synthetic@example.invalid</orderEmail>
+        <receiverCellPhone>010-0000-0000</receiverCellPhone>
+        <receiverSafeNumber>SYNTHETIC_SAFE_NUMBER_TO_MASK</receiverSafeNumber>
+        <receiverAddress>SYNTHETIC_ADDRESS_TO_MASK</receiverAddress>
+      </orderInfoData>
+      <orderGoodsData>
+        <item>
+          <sno>GODO-ITEM-002-A</sno>
+          <goodsNo>GODO-PRODUCT-002</goodsNo>
+          <optionSno>GODO-OPTION-002</optionSno>
+          <goodsNm>Synthetic meal kit</goodsNm>
+          <optionInfo>Two portions</optionInfo>
+          <goodsCnt>2</goodsCnt>
+          <goodsPrice>11900</goodsPrice>
+          <orderStatus>g1</orderStatus>
+          <invoiceCompanySno>CJGLS</invoiceCompanySno>
+          <invoiceNo>SYNTHETIC-TRACKING-002</invoiceNo>
+          <deliveryDt>2026-08-10 18:00:00</deliveryDt>
+        </item>
+      </orderGoodsData>
+    </order_data>
+    <order_data>
+      <orderNo>GODO-ORDER-001</orderNo>
+      <orderChannelFl>payco</orderChannelFl>
+      <orderStatus>p1</orderStatus>
+      <orderDate>2026-08-10 10:00:00</orderDate>
+      <orderGoodsData>
+        <item>
+          <sno>GODO-ITEM-001-A</sno>
+          <goodsNo>GODO-PRODUCT-001</goodsNo>
+          <goodsNm>Synthetic side dish</goodsNm>
+          <goodsCnt>1</goodsCnt>
+          <goodsPrice>5000</goodsPrice>
+          <orderStatus>p1</orderStatus>
+        </item>
+      </orderGoodsData>
+    </order_data>
+  </return>
+</data>

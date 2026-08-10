@@ -1,0 +1,21 @@
+{
+  "returnCode": "0000",
+  "message": "SUCCESS",
+  "dataCount": 1,
+  "data": {
+    "deliveryProgressStateList": [
+      {
+        "odNo": "LOTTE-ORDER-001",
+        "odSeq": 3,
+        "procSeq": 1,
+        "odPrgsStepCd": "14",
+        "dvTrcStatDttm": "20260810183000",
+        "owhoDttm": "20260810130000",
+        "dvCoCd": "0001",
+        "invcNo": "SYNTHETIC-INVOICE-001",
+        "odrNm": "SYNTHETIC_ORDERER_TO_MASK",
+        "emlAddr": "synthetic@example.invalid"
+      }
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "returnCode": "0000",
+  "message": "SUCCESS",
+  "dataCount": 1,
+  "data": {
+    "deliveryOrderList": [
+      {
+        "odNo": "LOTTE-ORDER-001",
+        "odSeq": 3,
+        "procSeq": 1,
+        "odPrgsStepCd": "11",
+        "odCmptDttm": "20260810100000",
+        "spdNo": "LOTTE-PRODUCT-001",
+        "sitmNo": "LOTTE-OPTION-001",
+        "spdNm": "Synthetic meal kit",
+        "sitmNm": "Two portions",
+        "odQty": 2,
+        "slAmt": 24000,
+        "actualAmt": 23000,
+        "dvpCustNm": "SYNTHETIC_NAME_TO_MASK",
+        "dvpMphnNo": "010-0000-0000",
+        "dvpStnmZipAddr": "SYNTHETIC_ADDRESS_TO_MASK"
+      }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ord:orders xmlns:ord="http://api.11st.co.kr/schema/order">
+  <ord:order>
+    <ord:orderNo>ELEVENST-ORDER-001</ord:orderNo>
+    <ord:orderStatus>PAYMENT_COMPLETE</ord:orderStatus>
+    <ord:deliveryStatus>SHIPPING</ord:deliveryStatus>
+    <ord:orderDate>2026-08-10 10:00:00</ord:orderDate>
+    <ord:paymentDate>2026-08-10 10:01:00</ord:paymentDate>
+    <ord:ordererName>SYNTHETIC_NAME_TO_MASK</ord:ordererName>
+    <ord:receiverPhone>010-0000-0000</ord:receiverPhone>
+    <ord:rcvrNm>SYNTHETIC_ABBREVIATED_NAME_TO_MASK</ord:rcvrNm>
+    <ord:orderProducts>
+      <ord:orderProduct>
+        <ord:orderProductNo>ELEVENST-ITEM-001</ord:orderProductNo>
+        <ord:productNo>ELEVENST-PRODUCT-001</ord:productNo>
+        <ord:optionNo>ELEVENST-OPTION-001</ord:optionNo>
+        <ord:productName>Synthetic meal kit</ord:productName>
+        <ord:optionName>Two portions</ord:optionName>
+        <ord:quantity>2</ord:quantity>
+        <ord:orderAmount>25000</ord:orderAmount>
+        <ord:deliveryCompanyCode>CJGLS</ord:deliveryCompanyCode>
+        <ord:invoiceNo>SYNTHETIC-INVOICE-001</ord:invoiceNo>
+        <ord:dispatchDate>2026-08-10 18:00:00</ord:dispatchDate>
+      </ord:orderProduct>
+      <ord:orderProduct>
+        <ord:orderProductNo>ELEVENST-ITEM-002</ord:orderProductNo>
+        <ord:productNo>ELEVENST-PRODUCT-002</ord:productNo>
+        <ord:productName>Synthetic side dish</ord:productName>
+        <ord:quantity>1</ord:quantity>
+        <ord:orderAmount>5000</ord:orderAmount>
+      </ord:orderProduct>
+    </ord:orderProducts>
+  </ord:order>
+</ord:orders>
