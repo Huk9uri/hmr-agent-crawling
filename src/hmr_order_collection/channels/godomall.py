@@ -60,11 +60,15 @@ class GodomallAdapter(ChannelAdapter):
                         yield record
 
             has_more = (_first_text(root, "lastOrder") or "").lower() == "true"
-            if not has_more or not orders:
+            if not has_more:
                 break
+            if not orders:
+                raise ValueError("Godomall continuation cursor was missing")
             last_order = _direct_text(orders[-1], "orderNo")
-            if not last_order or last_order in seen_last_orders:
-                break
+            if not last_order:
+                raise ValueError("Godomall continuation cursor was missing")
+            if last_order in seen_last_orders:
+                raise ValueError("Godomall continuation cursor was repeated")
             seen_last_orders.add(last_order)
             data["lastOrder"] = last_order
 

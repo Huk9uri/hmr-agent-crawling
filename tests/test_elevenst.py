@@ -23,13 +23,16 @@ def response(name, url):
 
 
 class FakeHttpClient:
-    def __init__(self, first_fixture="elevenst_empty.xml"):
-        self.first_fixture = first_fixture
+    def __init__(self, fixtures=("elevenst_empty.xml",)):
+        if isinstance(fixtures, str):
+            fixtures = (fixtures,)
+        self.fixtures = fixtures
         self.calls = []
 
     def request(self, method, url, **kwargs):
         self.calls.append((method, url, kwargs))
-        fixture = self.first_fixture if len(self.calls) == 1 else "elevenst_empty.xml"
+        index = len(self.calls) - 1
+        fixture = self.fixtures[index] if index < len(self.fixtures) else "elevenst_empty.xml"
         return response(fixture, url)
 
 
@@ -63,6 +66,19 @@ class ElevenstAdapterTests(unittest.TestCase):
             [call[1] for call in http.calls],
             [f"{endpoint}/20260810/20260810" for endpoint in ORDER_ENDPOINTS],
         )
+
+    def test_more_advanced_feed_replaces_duplicate_from_earlier_feed(self):
+        http = FakeHttpClient(
+            ("elevenst_duplicate_complete.xml", "elevenst_empty.xml", "elevenst_empty.xml", "elevenst_duplicate_delivered.xml")
+        )
+
+        records = list(ElevenstAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].identity, ("ELEVENST-ORDER-DUP", "ELEVENST-ITEM-DUP"))
+        self.assertEqual(records[0].columns["OrderStatus"], "DELIVERY_COMPLETE")
+        self.assertEqual(records[0].columns["DeliveryStatus"], "DELIVERED")
+        self.assertEqual(records[0].columns["TrackingNumber"], "SYNTHETIC-TRACKING-DELIVERED")
 
     def test_successful_empty_namespaced_responses_return_zero_records(self):
         self.assertEqual(list(ElevenstAdapter(config(), http=FakeHttpClient()).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))), [])

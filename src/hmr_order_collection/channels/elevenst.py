@@ -15,9 +15,9 @@ from hmr_order_collection.models import ChannelRecord
 
 
 BASE_URL = "https://api.11st.co.kr/rest/ordservices"
-ORDER_ENDPOINTS = tuple(
-    f"{BASE_URL}/{state}" for state in ("complete", "packing", "shipping", "delivered")
-)
+ORDER_STATES = ("complete", "packing", "shipping", "delivered")
+ORDER_ENDPOINTS = tuple(f"{BASE_URL}/{state}" for state in ORDER_STATES)
+STATE_PRECEDENCE = {state: precedence for precedence, state in enumerate(ORDER_STATES)}
 _PRIVATE_FIELDS = frozenset(
     {
         "ordId",
@@ -56,8 +56,9 @@ class ElevenstAdapter(ChannelAdapter):
         start = window.start.strftime("%Y%m%d")
         end = window.end.strftime("%Y%m%d")
         headers = {"Accept": "application/xml", "openapikey": self._api_key}
-        seen: set[tuple[str, str]] = set()
-        for endpoint in ORDER_ENDPOINTS:
+        records: dict[tuple[str, str], ChannelRecord] = {}
+        precedence_by_identity: dict[tuple[str, str], int] = {}
+        for state, endpoint in zip(ORDER_STATES, ORDER_ENDPOINTS):
             response = self._http.request(
                 "GET", f"{endpoint}/{start}/{end}", headers=dict(headers)
             )
@@ -65,9 +66,11 @@ class ElevenstAdapter(ChannelAdapter):
             _raise_for_business_error(root)
             for order_element, product_element in _order_products(root):
                 record = _map_record(order_element, product_element)
-                if record.identity not in seen:
-                    seen.add(record.identity)
-                    yield record
+                precedence = STATE_PRECEDENCE[state]
+                if precedence > precedence_by_identity.get(record.identity, -1):
+                    records[record.identity] = record
+                    precedence_by_identity[record.identity] = precedence
+        yield from records.values()
 
 
 def _raise_for_business_error(root: ElementTree.Element) -> None:

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <header><code>000</code><msg>SUCCESS</msg><lastOrder>false</lastOrder></header>
+  <return>
+    <order_data>
+      <orderNo>GODO-ORDER-000</orderNo>
+      <orderChannelFl>shop</orderChannelFl>
+      <orderStatus>p1</orderStatus>
+      <orderGoodsData>
+        <item>
+          <sno>GODO-ITEM-000-A</sno>
+          <goodsNo>GODO-PRODUCT-000</goodsNo>
+          <goodsNm>Synthetic final-page item</goodsNm>
+          <goodsCnt>1</goodsCnt>
+          <goodsPrice>3000</goodsPrice>
+        </item>
+      </orderGoodsData>
+    </order_data>
+  </return>
+</data>

@@ -37,16 +37,28 @@ def config():
 
 
 class GodomallAdapterTests(unittest.TestCase):
-    def test_fetch_follows_last_order_once_and_stops_on_repeated_continuation(self):
-        http = FakeHttpClient(["godomall_orders_page.xml", "godomall_orders_page.xml"])
+    def test_fetch_follows_last_order_to_a_normal_final_page(self):
+        http = FakeHttpClient(["godomall_orders_page.xml", "godomall_orders_last_page.xml"])
 
         records = list(GodomallAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
-        self.assertEqual(len(records), 2)
+        self.assertEqual(len(records), 3)
         self.assertEqual(len(http.calls), 2)
         self.assertEqual(http.calls[0][0:2], ("POST", GODOMALL_ORDER_SEARCH_URL))
         self.assertEqual(http.calls[0][2]["data"], {"partner_key": "SYNTHETIC_PARTNER", "key": "SYNTHETIC_USER", "dateType": "order", "startDate": "2026-08-10", "endDate": "2026-08-10", "size": 100})
         self.assertEqual(http.calls[1][2]["data"]["lastOrder"], "GODO-ORDER-001")
+
+    def test_fetch_raises_when_more_pages_have_a_repeated_continuation(self):
+        http = FakeHttpClient(["godomall_orders_page.xml", "godomall_orders_page.xml"])
+
+        with self.assertRaisesRegex(ValueError, "continuation"):
+            list(GodomallAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
+
+    def test_fetch_raises_when_more_pages_have_no_continuation(self):
+        http = FakeHttpClient(["godomall_missing_cursor_page.xml"])
+
+        with self.assertRaisesRegex(ValueError, "continuation"):
+            list(GodomallAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
     def test_maps_only_deployed_columns_retains_channel_and_masks_raw_xml(self):
         http = FakeHttpClient(["godomall_orders_page.xml", "godomall_empty_page.xml"])

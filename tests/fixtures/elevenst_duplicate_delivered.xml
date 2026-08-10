@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ord:orders xmlns:ord="http://api.11st.co.kr/schema/order">
+  <ord:order>
+    <ord:orderNo>ELEVENST-ORDER-DUP</ord:orderNo>
+    <ord:orderStatus>DELIVERY_COMPLETE</ord:orderStatus>
+    <ord:deliveryStatus>DELIVERED</ord:deliveryStatus>
+    <ord:orderProducts>
+      <ord:orderProduct>
+        <ord:orderProductNo>ELEVENST-ITEM-DUP</ord:orderProductNo>
+        <ord:productNo>ELEVENST-PRODUCT-DUP</ord:productNo>
+        <ord:productName>Synthetic duplicate item</ord:productName>
+        <ord:quantity>1</ord:quantity>
+        <ord:invoiceNo>SYNTHETIC-TRACKING-DELIVERED</ord:invoiceNo>
+      </ord:orderProduct>
+    </ord:orderProducts>
+  </ord:order>
+</ord:orders>

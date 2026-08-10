@@ -33,3 +33,41 @@ Implemented with test-first RED/GREEN coverage. All fixtures are synthetic and m
 - LotteON documents a one-day maximum for both selected endpoints, so the adapter rejects wider windows before HTTP. No additional vendor identifier is required for the top-level seller; documented `lrtrNo` is optional and applies to subordinate-trader filtering.
 - 11st's detailed seller guide is behind authenticated Seller Office. The read-only ordservices path/header contract was verified from the public endpoint's authentication response, but an exact maximum date span could not be confirmed from current public documentation. The adapter therefore does not guess a limit; a credentialed production dry run should validate state coverage, date boundaries, and response field variants before scheduling.
 - 11st duplicates can appear in multiple state feeds. The adapter keeps the first occurrence for an `(orderNo, orderProductNo)` identity during a fetch, following the endpoint order `complete`, `packing`, `shipping`, then `delivered`.
+
+## Fix round 1/5: authoritative state selection and paging failure safety
+
+Addressed both Important review findings.
+
+- 11st now buffers records across all four state feeds and applies the explicit lifecycle precedence `complete < packing < shipping < delivered`. A duplicate from a more advanced feed replaces the earlier payload before any record is emitted.
+- Godomall now raises a collection error when `lastOrder` is true but the response cannot provide a new continuation cursor. Missing and repeated cursors can no longer turn a partial fetch into apparent success, while a normal multi-page response still completes.
+- Added four synthetic fixtures covering a duplicate 11st item in the complete/delivered feeds, a valid final Godomall page, and a missing-cursor Godomall page.
+
+### RED evidence
+
+Command:
+
+```powershell
+$env:PYTHONPATH='src'; $env:PYTHONDONTWRITEBYTECODE='1'; & 'C:\Users\user1\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tests.test_godomall tests.test_elevenst -v
+```
+
+Result before production changes: 9 tests ran with 3 expected failures. The duplicate 11st item retained `PAYMENT_COMPLETE` instead of `DELIVERY_COMPLETE`, and neither the repeated nor missing Godomall continuation raised an error.
+
+### GREEN evidence
+
+Focused command:
+
+```powershell
+$env:PYTHONPATH='src'; $env:PYTHONDONTWRITEBYTECODE='1'; & 'C:\Users\user1\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tests.test_godomall tests.test_lotteon tests.test_elevenst -v
+```
+
+Result: all 12 focused tests passed in 0.029 seconds.
+
+Full-suite command:
+
+```powershell
+$env:UV_CACHE_DIR='C:\Users\user1\Documents\HMR_Agent_Crawling\.tmp_task4_fix1_uv_cache'; $env:PYTHONPATH='src'; $env:PYTHONDONTWRITEBYTECODE='1'; uv run --python 'C:\Users\user1\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' --with bcrypt --with requests python -m unittest discover -s tests -v
+```
+
+Result: all 36 tests passed in 0.063 seconds.
+
+The original first-occurrence note above is superseded by this fix: cross-state duplicates now retain the payload from the most advanced state feed.
