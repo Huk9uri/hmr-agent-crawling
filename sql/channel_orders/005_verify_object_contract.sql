@@ -33,7 +33,7 @@ DECLARE @ExpectedColumns table
 (
     TableName sysname NOT NULL,
     ColumnName sysname NOT NULL,
-    CONSTRAINT PK_ExpectedColumns PRIMARY KEY (TableName, ColumnName)
+    PRIMARY KEY (TableName, ColumnName)
 );
 
 INSERT @ExpectedColumns (TableName, ColumnName)

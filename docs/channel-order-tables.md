@@ -50,6 +50,8 @@ sql/channel_orders/090_verify_channel_order_tables.sql
 
 `PayloadHash`가 기존 최신 행과 같으면 상태와 마스킹 JSON이 동일하므로 새 이력 행 삽입을 생략할 수 있다.
 
+필터형 최신행 인덱스가 있으므로 수집기 DB 연결에서도 `ANSI_NULLS`, `ANSI_PADDING`, `ANSI_WARNINGS`, `ARITHABORT`, `CONCAT_NULL_YIELDS_NULL`, `QUOTED_IDENTIFIER`를 `ON`으로, `NUMERIC_ROUNDABORT`를 `OFF`로 유지해야 한다. 제공된 인덱스 및 통합 검증 SQL은 이 옵션을 직접 설정한다.
+
 ## 개인정보와 인증정보
 
 - `RawJson`에는 고객명, 전화번호, 주소, 이메일, 개인통관번호를 마스킹한 값만 저장한다.
@@ -70,4 +72,4 @@ sql/channel_orders/090_verify_channel_order_tables.sql
 
 ## 현재 배포 상태
 
-SQL 파일은 `codex/channel-order-tables` 브랜치에 구현돼 있다. 실제 `ecommerce` 데이터베이스 배포는 DB 관리자 또는 승인된 SSMS 세션에서 검증 스크립트와 함께 별도로 수행해야 한다.
+2026-08-10 `ecommerce` 데이터베이스에 7개 채널별 주문상품 테이블과 28개 인덱스를 적용했다. 객체·컬럼·인덱스 검증과 7개 가상 행 INSERT 후 ROLLBACK 검증을 완료했으며, 검증용 데이터는 남지 않았다.

@@ -1,3 +1,11 @@
+SET ANSI_NULLS ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET QUOTED_IDENTIFIER ON;
+SET NUMERIC_ROUNDABORT OFF;
+
 :r .\sql\channel_orders\005_verify_object_contract.sql
 :r .\sql\channel_orders\060_verify_history_constraints.sql
 

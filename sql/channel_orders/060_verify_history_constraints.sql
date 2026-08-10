@@ -7,7 +7,7 @@ DECLARE @ExpectedIndexes table
     IndexName sysname NOT NULL,
     MustBeUnique bit NOT NULL,
     MustBeFiltered bit NOT NULL,
-    CONSTRAINT PK_ExpectedIndexes PRIMARY KEY (TableName, IndexName)
+    PRIMARY KEY (TableName, IndexName)
 );
 
 INSERT @ExpectedIndexes (TableName, IndexName, MustBeUnique, MustBeFiltered)
