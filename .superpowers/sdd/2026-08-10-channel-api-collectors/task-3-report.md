@@ -31,3 +31,34 @@ Implemented with test-first RED/GREEN coverage. No live API calls were made and 
 - Coupang exposes one PO `status` in this response, not a separate delivery-status field. It is retained in both normalized/raw order and delivery status columns so the deployed schema remains queryable without fabricating a second status.
 - Naver `OptionId` maps from documented `itemNo` (the automatically generated unique option/add-on item number), not seller-entered `optionManageCode`.
 - Runtime installation must include `bcrypt` in addition to the existing `requests` dependency.
+
+## Fix round 1/5: documented RawJson privacy fields
+
+Addressed the Important review finding for Naver `ordererId`, `ordererNo`, and `individualCustomUniqueCode`, and Coupang `extraProperties.taxReceiptInfo.appliedValue`.
+
+- Added normalized exact-key masking for the three Naver identifiers, including camelCase and separator variants.
+- Added parent-context masking for `taxReceiptInfo.appliedValue` only. Ordinary `orderId`, `productId`, and non-tax `appliedValue` contexts remain unchanged.
+- Extended both channel fixtures with synthetic reviewed response fields and added channel-level raw JSON assertions.
+- Added a shared-masker regression test covering both positive and negative scope.
+
+### RED evidence
+
+Command:
+
+```powershell
+$env:PYTHONPATH='src'; uv run --with requests --with bcrypt --python 3.12 python -m unittest tests.test_masking tests.test_naver tests.test_coupang -v
+```
+
+Result before the production change: 11 tests ran with 3 expected failures. The shared masker returned all reviewed values unchanged; the Naver raw JSON contained `SYNTHETIC_ORDERER_ID_TO_MASK`; and the Coupang raw JSON contained `SYNTHETIC_TAX_RECEIPT_VALUE_TO_MASK`.
+
+### GREEN evidence
+
+The same focused command passed all 11 tests in 0.028 seconds.
+
+Full-suite command:
+
+```powershell
+$env:PYTHONPATH='src'; uv run --with requests --with bcrypt --python 3.12 python -m unittest discover -s tests -v
+```
+
+Result: all 24 tests passed in 0.048 seconds.

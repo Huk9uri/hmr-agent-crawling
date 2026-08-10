@@ -40,6 +40,42 @@ class MaskPayloadTests(unittest.TestCase):
             },
         )
 
+    def test_masks_documented_private_identifiers_and_only_contextual_applied_value(self):
+        payload = {
+            "order": {
+                "orderId": "ORDER-1",
+                "ordererId": "PRIVATE-ORDERER-ID",
+                "orderer_no": "PRIVATE-ORDERER-NO",
+            },
+            "productOrder": {
+                "productId": "PRODUCT-1",
+                "individual_custom_unique_code": "PRIVATE-CUSTOMS-ID",
+            },
+            "extraProperties": {
+                "taxReceiptInfo": {"appliedValue": "PRIVATE-TAX-RECEIPT"},
+                "promotionInfo": {"appliedValue": "PUBLIC-DISCOUNT-RULE"},
+            },
+        }
+
+        self.assertEqual(
+            mask_payload(payload),
+            {
+                "order": {
+                    "orderId": "ORDER-1",
+                    "ordererId": "***",
+                    "orderer_no": "***",
+                },
+                "productOrder": {
+                    "productId": "PRODUCT-1",
+                    "individual_custom_unique_code": "***",
+                },
+                "extraProperties": {
+                    "taxReceiptInfo": {"appliedValue": "***"},
+                    "promotionInfo": {"appliedValue": "PUBLIC-DISCOUNT-RULE"},
+                },
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

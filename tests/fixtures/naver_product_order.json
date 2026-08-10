@@ -7,6 +7,8 @@
         "orderId": "NAVER-ORDER-001",
         "orderDate": "2026-08-09T10:00:00.000+09:00",
         "paymentDate": "2026-08-09T10:01:00.000+09:00",
+        "ordererId": "SYNTHETIC_ORDERER_ID_TO_MASK",
+        "ordererNo": "SYNTHETIC_ORDERER_NO_TO_MASK",
         "ordererName": "SYNTHETIC_NAME_TO_MASK",
         "ordererTel": "SYNTHETIC_PHONE_TO_MASK"
       },
@@ -22,6 +24,7 @@
         "totalPaymentAmount": 24000,
         "productOrderStatus": "DELIVERED",
         "claimStatus": null,
+        "individualCustomUniqueCode": "SYNTHETIC_CUSTOMS_IDENTIFIER_TO_MASK",
         "shippingAddress": {
           "name": "SYNTHETIC_RECEIVER_TO_MASK",
           "baseAddress": "SYNTHETIC_ADDRESS_TO_MASK",

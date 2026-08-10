@@ -13,9 +13,24 @@ _SENSITIVE_PARTS = frozenset(
 _PRODUCT_OR_ORDER_IDENTIFIER = re.compile(r"(?:order|product)[_-]?(?:id|no|number|code|seq|sno)\Z", re.IGNORECASE)
 _PRODUCT_NAME = re.compile(r"product[_-]?name\Z", re.IGNORECASE)
 _KEY_PARTS = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|[^A-Za-z0-9]+")
+_NON_ALPHANUMERIC = re.compile(r"[^a-z0-9]+")
+_SENSITIVE_EXACT_KEYS = frozenset(
+    {"ordererid", "ordererno", "individualcustomuniquecode"}
+)
 
 
-def _is_sensitive_key(key: object) -> bool:
+def _normalized_key(key: object) -> str:
+    if not isinstance(key, str):
+        return ""
+    return _NON_ALPHANUMERIC.sub("", key.lower())
+
+
+def _is_sensitive_key(key: object, parent_key: object = None) -> bool:
+    normalized = _normalized_key(key)
+    if normalized in _SENSITIVE_EXACT_KEYS:
+        return True
+    if normalized == "appliedvalue" and _normalized_key(parent_key) == "taxreceiptinfo":
+        return True
     if (
         not isinstance(key, str)
         or _PRODUCT_OR_ORDER_IDENTIFIER.search(key)
@@ -28,15 +43,19 @@ def _is_sensitive_key(key: object) -> bool:
 
 def mask_payload(value: object) -> object:
     """Recursively replace values associated with sensitive field names."""
+    return _mask_payload(value)
+
+
+def _mask_payload(value: object, parent_key: object = None) -> object:
     if isinstance(value, dict):
         return {
-            key: "***" if _is_sensitive_key(key) else mask_payload(item)
+            key: "***" if _is_sensitive_key(key, parent_key) else _mask_payload(item, key)
             for key, item in value.items()
         }
     if isinstance(value, list):
-        return [mask_payload(item) for item in value]
+        return [_mask_payload(item, parent_key) for item in value]
     if isinstance(value, tuple):
-        return tuple(mask_payload(item) for item in value)
+        return tuple(_mask_payload(item, parent_key) for item in value)
     return value
 
 

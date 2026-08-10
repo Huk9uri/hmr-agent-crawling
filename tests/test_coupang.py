@@ -139,9 +139,12 @@ class CoupangAdapterTests(unittest.TestCase):
             "SYNTHETIC_PHONE_TO_MASK",
             "SYNTHETIC_ADDRESS_TO_MASK",
             "SYNTHETIC_CUSTOMS_TO_MASK",
+            "SYNTHETIC_TAX_RECEIPT_VALUE_TO_MASK",
         ):
             self.assertNotIn(private_value, record.raw_json)
         self.assertIn('"receiver":"***"', record.raw_json)
+        self.assertIn('"taxReceiptInfo":{"appliedValue":"***"', record.raw_json)
+        self.assertIn('"promotionInfo":{"appliedValue":"PUBLIC_DISCOUNT_RULE_TO_KEEP"}', record.raw_json)
 
     def test_fetch_rejects_windows_longer_than_31_days_before_http(self):
         http = FakeHttpClient(lambda *_: {})

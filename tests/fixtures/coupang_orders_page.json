@@ -14,6 +14,15 @@
       },
       "paidAt": "2026-08-09T10:01:00.000000+09:00",
       "status": "FINAL_DELIVERY",
+      "extraProperties": {
+        "taxReceiptInfo": {
+          "receiptType": "CASH_RECEIPT",
+          "appliedValue": "SYNTHETIC_TAX_RECEIPT_VALUE_TO_MASK"
+        },
+        "promotionInfo": {
+          "appliedValue": "PUBLIC_DISCOUNT_RULE_TO_KEEP"
+        }
+      },
       "receiver": {
         "name": "SYNTHETIC_RECEIVER_TO_MASK",
         "safeNumber": "SYNTHETIC_PHONE_TO_MASK",

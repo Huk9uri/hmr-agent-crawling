@@ -183,7 +183,13 @@ class NaverAdapterTests(unittest.TestCase):
         )
         self.assertNotIn("SYNTHETIC_NAME_TO_MASK", record.raw_json)
         self.assertNotIn("SYNTHETIC_PHONE_TO_MASK", record.raw_json)
+        self.assertNotIn("SYNTHETIC_ORDERER_ID_TO_MASK", record.raw_json)
+        self.assertNotIn("SYNTHETIC_ORDERER_NO_TO_MASK", record.raw_json)
+        self.assertNotIn("SYNTHETIC_CUSTOMS_IDENTIFIER_TO_MASK", record.raw_json)
         self.assertIn('"ordererName":"***"', record.raw_json)
+        self.assertIn('"ordererId":"***"', record.raw_json)
+        self.assertIn('"ordererNo":"***"', record.raw_json)
+        self.assertIn('"individualCustomUniqueCode":"***"', record.raw_json)
 
     def test_fetch_rejects_windows_longer_than_24_hours_before_http(self):
         http = FakeHttpClient(lambda *_: {})
