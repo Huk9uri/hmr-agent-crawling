@@ -69,6 +69,7 @@ class NaverAdapter(ChannelAdapter):
                 headers={**headers, "Content-Type": "application/json"},
                 json={"productOrderIds": batch, "quantityClaimCompatibility": True},
             )
+            self._record_page()
             payload = parse_json(response)
             for detail in payload.get("data", []):
                 yield _map_record(detail)
@@ -111,6 +112,7 @@ class NaverAdapter(ChannelAdapter):
         seen_continuations: set[tuple[str, str]] = set()
         while True:
             response = self._http.request("GET", CHANGED_ORDERS_URL, headers=headers, params=params)
+            self._record_page()
             payload = parse_json(response)
             data = payload.get("data") or {}
             for status in data.get("lastChangeStatuses", []):

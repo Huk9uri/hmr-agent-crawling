@@ -97,6 +97,7 @@ class NaverAdapterTests(unittest.TestCase):
         records = list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
         self.assertEqual(len(records), 301)
+        self.assertEqual(adapter.pages_fetched, 4)
         token_call = http.calls[0]
         self.assertEqual(token_call[0:2], ("POST", "https://api.commerce.naver.com/external/v1/oauth2/token"))
         self.assertEqual(

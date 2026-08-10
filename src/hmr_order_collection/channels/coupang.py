@@ -111,6 +111,7 @@ class CoupangAdapter(ChannelAdapter):
                 "X-Requested-By": self._vendor_id,
             },
         )
+        self._record_page()
         payload = parse_json(response)
         if not isinstance(payload, dict):
             raise ValueError("Coupang order response must be a JSON object")

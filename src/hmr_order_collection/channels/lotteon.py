@@ -6,7 +6,12 @@ from collections.abc import Iterator
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from hmr_order_collection.channels.base import ChannelAdapter, DateWindow
+from hmr_order_collection.channels.base import (
+    ChannelAdapter,
+    DateWindow,
+    InvalidPeriodError,
+    explicit_invalid_period_message,
+)
 from hmr_order_collection.config import AppConfig
 from hmr_order_collection.http import HttpClient, parse_json
 from hmr_order_collection.masking import canonical_payload
@@ -82,10 +87,18 @@ class LotteonAdapter(ChannelAdapter):
         list_key: str,
     ) -> list[dict[str, Any]]:
         response = self._http.request("POST", url, headers=dict(headers), json=dict(body))
+        self._record_page()
         payload = parse_json(response)
         if not isinstance(payload, dict):
             raise ValueError("LotteON response must be a JSON object")
         if payload.get("returnCode") not in {"0000", "SUCCESS"}:
+            message = (
+                payload.get("message")
+                or payload.get("returnMessage")
+                or payload.get("errorMessage")
+            )
+            if explicit_invalid_period_message(message):
+                raise InvalidPeriodError("LotteON rejected the requested period")
             raise ValueError("LotteON response reported a business failure")
         data = payload.get("data")
         if data is None:

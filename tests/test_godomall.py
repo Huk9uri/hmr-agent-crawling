@@ -5,7 +5,7 @@ import unittest
 
 import requests
 
-from hmr_order_collection.channels.base import DateWindow
+from hmr_order_collection.channels.base import DateWindow, InvalidPeriodError
 from hmr_order_collection.channels.godomall import GODOMALL_ORDER_SEARCH_URL, GodomallAdapter
 from hmr_order_collection.config import AppConfig
 from hmr_order_collection.database import TABLES
@@ -37,12 +37,27 @@ def config():
 
 
 class GodomallAdapterTests(unittest.TestCase):
+    def test_explicit_invalid_period_response_raises_typed_probe_signal(self):
+        adapter = GodomallAdapter(
+            config(), http=FakeHttpClient(["godomall_invalid_period.xml"])
+        )
+
+        with self.assertRaises(InvalidPeriodError):
+            list(
+                adapter.fetch(
+                    DateWindow(date(2026, 7, 11), date(2026, 8, 10))
+                )
+            )
+        self.assertEqual(adapter.pages_fetched, 1)
+
     def test_fetch_follows_last_order_to_a_normal_final_page(self):
         http = FakeHttpClient(["godomall_orders_page.xml", "godomall_orders_last_page.xml"])
+        adapter = GodomallAdapter(config(), http=http)
 
-        records = list(GodomallAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
+        records = list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
         self.assertEqual(len(records), 3)
+        self.assertEqual(adapter.pages_fetched, 2)
         self.assertEqual(len(http.calls), 2)
         self.assertEqual(http.calls[0][0:2], ("POST", GODOMALL_ORDER_SEARCH_URL))
         self.assertEqual(http.calls[0][2]["data"], {"partner_key": "SYNTHETIC_PARTNER", "key": "SYNTHETIC_USER", "dateType": "order", "startDate": "2026-08-10", "endDate": "2026-08-10", "size": 100})

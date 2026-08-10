@@ -64,6 +64,7 @@ class SsgAdapter(ChannelAdapter):
                 }
             },
         )
+        self._record_page()
         payload = parse_json(response)
         if not isinstance(payload, dict):
             raise ValueError("SSG order response must be a JSON object")

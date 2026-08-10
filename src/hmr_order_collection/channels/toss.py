@@ -70,6 +70,7 @@ class TossShoppingAdapter(ChannelAdapter):
                 headers={"Accept": "application/json", "Authorization": f"Bearer {token}"},
                 params=dict(params),
             )
+            self._record_page()
             payload = parse_json(response)
             if not isinstance(payload, dict):
                 raise ValueError("Toss Shopping order response must be a JSON object")

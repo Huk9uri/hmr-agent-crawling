@@ -7,7 +7,12 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from xml.etree import ElementTree
 
-from hmr_order_collection.channels.base import ChannelAdapter, DateWindow
+from hmr_order_collection.channels.base import (
+    ChannelAdapter,
+    DateWindow,
+    InvalidPeriodError,
+    explicit_invalid_period_message,
+)
 from hmr_order_collection.config import AppConfig
 from hmr_order_collection.http import HttpClient, parse_xml
 from hmr_order_collection.masking import canonical_payload
@@ -47,9 +52,17 @@ class GodomallAdapter(ChannelAdapter):
                 },
                 data=dict(data),
             )
+            self._record_page()
             root = parse_xml(response)
             code = _first_text(root, "code")
             if code not in {None, "000"}:
+                message = (
+                    _first_text(root, "message")
+                    or _first_text(root, "msg")
+                    or _first_text(root, "errorMessage")
+                )
+                if explicit_invalid_period_message(message):
+                    raise InvalidPeriodError("Godomall rejected the requested period")
                 raise ValueError("Godomall order response reported a business failure")
 
             orders = _elements(root, "order_data")

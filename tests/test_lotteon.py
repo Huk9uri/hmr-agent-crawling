@@ -6,7 +6,7 @@ import unittest
 
 import requests
 
-from hmr_order_collection.channels.base import DateWindow
+from hmr_order_collection.channels.base import DateWindow, InvalidPeriodError
 from hmr_order_collection.channels.lotteon import DELIVERY_ORDERS_URL, DELIVERY_PROGRESS_URL, LotteonAdapter
 from hmr_order_collection.config import AppConfig
 from hmr_order_collection.database import TABLES
@@ -38,12 +38,33 @@ def config():
 
 
 class LotteonAdapterTests(unittest.TestCase):
+    def test_explicit_invalid_period_response_raises_typed_probe_signal(self):
+        adapter = LotteonAdapter(
+            config(),
+            http=FakeHttpClient(
+                {
+                    DELIVERY_ORDERS_URL: "lotteon_invalid_period.json",
+                    DELIVERY_PROGRESS_URL: "lotteon_empty.json",
+                }
+            ),
+        )
+
+        with self.assertRaises(InvalidPeriodError):
+            list(
+                adapter.fetch(
+                    DateWindow(date(2026, 8, 10), date(2026, 8, 10))
+                )
+            )
+        self.assertEqual(adapter.pages_fetched, 1)
+
     def test_fetch_calls_only_two_read_only_search_endpoints_with_official_headers(self):
         http = FakeHttpClient({DELIVERY_ORDERS_URL: "lotteon_empty.json", DELIVERY_PROGRESS_URL: "lotteon_empty.json"})
+        adapter = LotteonAdapter(config(), http=http)
 
-        records = list(LotteonAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
+        records = list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
         self.assertEqual(records, [])
+        self.assertEqual(adapter.pages_fetched, 2)
         self.assertEqual([call[0:2] for call in http.calls], [("POST", DELIVERY_ORDERS_URL), ("POST", DELIVERY_PROGRESS_URL)])
         for _, _, kwargs in http.calls:
             self.assertEqual(kwargs["headers"], {"Accept": "application/json", "Accept-Language": "ko", "Authorization": "Bearer SYNTHETIC_LOTTE_KEY", "Content-Type": "application/json", "X-Timezone": "GMT+09:00"})

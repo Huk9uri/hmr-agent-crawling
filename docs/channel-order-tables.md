@@ -41,22 +41,32 @@ sql/channel_orders/090_verify_channel_order_tables.sql
 
 ## Collector CLI
 
-Use Python 3.12 and install the exact runtime versions from `requirements.txt`.
+Use Python 3.12 and install the fully resolved, hash-locked runtime from
+`requirements.lock`. `requirements.txt` contains only the direct dependency
+inputs used to regenerate that lock.
 Configuration is loaded strictly from `.env` (or the file passed with
 `--config`). Use `.env.example` as the key-only template; API and database
 credentials are never accepted as command-line arguments.
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes -r requirements.lock
 $env:PYTHONPATH = "src"
 python -m hmr_order_collection.cli list
 python -m hmr_order_collection.cli collect --channel naver --from 2026-08-10 --to 2026-08-10 --dry-run
 python -m hmr_order_collection.cli collect-all --to 2026-08-10 --maximum-window --dry-run --continue-on-error
+python -m hmr_order_collection.cli collect-all --to 2026-08-10 --maximum-window --probe-boundaries --dry-run --continue-on-error
+```
+
+Regenerate the lock only as an intentional dependency update:
+
+```powershell
+uv pip compile requirements.txt --python-version 3.12 --generate-hashes --output-file requirements.lock
 ```
 
 Collection is a dry run by default. Database persistence is enabled only by
 the explicit `--write-db` flag. The CLI emits one JSON summary containing
-channel names, status, and counts; it never emits order records, exception
+channel names, status, window/page/record/write counts, and safe probe counts;
+it never emits order records, exception
 messages, response bodies, PII, API credentials, or database credentials.
 Use `--continue-on-error` to attempt later channels after a channel failure.
 The process still exits nonzero when any channel fails.
@@ -76,6 +86,14 @@ The initial maximum-window policy always ends on the explicit `--to` date:
 Godomall and 11st remain at a conservative one-day range until the controller
 performs the planned authenticated, read-only boundary checks after independent
 code review. Do not widen either range based only on HTTP status.
+
+`--probe-boundaries` is dry-run-only. It starts Godomall at 31 inclusive days,
+11st at 7, and LotteON at its official 1-day limit. A candidate is reduced by
+one day only when the adapter recognizes an explicit invalid-period business
+response; authentication, transport, parsing, and other business failures stop
+that channel without reduction. The JSON summary exposes `probe_attempts`,
+`probe_invalid_periods`, `verified_maximum_days`, and `pages` as count-only
+metadata. LotteON is never queried above one day.
 
 생성 스크립트와 인덱스 스크립트는 두 번 실행해도 같은 객체를 중복 생성하지 않는다.
 

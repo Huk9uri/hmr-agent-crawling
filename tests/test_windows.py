@@ -1,10 +1,16 @@
 import unittest
 from datetime import date
 
-from hmr_order_collection.channels.base import iter_windows
+from hmr_order_collection.channels.base import explicit_invalid_period_message, iter_windows
 
 
 class DateWindowTests(unittest.TestCase):
+    def test_only_explicit_period_rejection_messages_are_classified_for_probe_reduction(self):
+        self.assertTrue(explicit_invalid_period_message("조회기간이 최대 범위를 초과했습니다"))
+        self.assertTrue(explicit_invalid_period_message("Invalid date range: period too long"))
+        self.assertFalse(explicit_invalid_period_message("authentication failed"))
+        self.assertFalse(explicit_invalid_period_message("temporary server error"))
+
     def test_one_day_range_is_one_inclusive_window(self):
         self.assertEqual(
             [(window.start, window.end) for window in iter_windows(date(2026, 8, 10), date(2026, 8, 10), 1)],

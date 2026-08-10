@@ -12,17 +12,31 @@ from typing import Any, TextIO
 from uuid import uuid4
 
 from hmr_order_collection.channels import (
+    BOUNDARY_PROBE_START_DAYS,
     CHANNEL_NAMES,
     MAXIMUM_WINDOW_DAYS,
     build_adapter_registry,
 )
-from hmr_order_collection.channels.base import ChannelAdapter, DateWindow, iter_windows
+from hmr_order_collection.channels.base import (
+    ChannelAdapter,
+    DateWindow,
+    InvalidPeriodError,
+    iter_windows,
+)
 from hmr_order_collection.config import AppConfig, ConfigurationError, load_config
 from hmr_order_collection.database import DatabaseWriter, connect_from_config
 
 
 class CliUsageError(ValueError):
     """A safe command-line validation failure with no credential content."""
+
+
+class ChannelRunFailure(RuntimeError):
+    """Carries a count-only partial summary while suppressing source details."""
+
+    def __init__(self, summary: dict[str, Any]) -> None:
+        super().__init__("channel execution failed")
+        self.summary = summary
 
 
 class _SafeArgumentParser(argparse.ArgumentParser):
@@ -43,6 +57,7 @@ def _parser() -> argparse.ArgumentParser:
     collect_all = commands.add_parser("collect-all", help="collect every channel")
     _add_collection_options(collect_all)
     collect_all.add_argument("--maximum-window", action="store_true", required=True)
+    collect_all.add_argument("--probe-boundaries", action="store_true")
     return parser
 
 
@@ -89,6 +104,7 @@ def _empty_summary(channel: str) -> dict[str, Any]:
         "channel": channel,
         "status": "ok",
         "windows": 0,
+        "pages": 0,
         "records": 0,
         "inserted": 0,
         "changed": 0,
@@ -96,26 +112,71 @@ def _empty_summary(channel: str) -> dict[str, Any]:
     }
 
 
-def _collect_channel(
-    channel: str,
+def _fetch_windows(
     adapter: ChannelAdapter,
     windows: Iterable[DateWindow],
-    writer: DatabaseWriter | None,
-) -> dict[str, Any]:
-    summary = _empty_summary(channel)
+    summary: dict[str, Any],
+) -> list[Any]:
     records: list[Any] = []
     for window in windows:
         window_records = list(adapter.fetch(window))
         records.extend(window_records)
         summary["windows"] += 1
         summary["records"] += len(window_records)
-    if writer is not None:
-        written = writer.write(channel, records, uuid4())
-        summary.update(
-            inserted=written.inserted,
-            changed=written.changed,
-            skipped=written.skipped,
+    return records
+
+
+def _probe_boundary(
+    channel: str,
+    adapter: ChannelAdapter,
+    end: date,
+    summary: dict[str, Any],
+) -> list[Any]:
+    summary.update(probe_attempts=0, probe_invalid_periods=0)
+    for candidate_days in range(BOUNDARY_PROBE_START_DAYS[channel], 0, -1):
+        summary["probe_attempts"] += 1
+        window = DateWindow(end - timedelta(days=candidate_days - 1), end)
+        try:
+            records = list(adapter.fetch(window))
+        except InvalidPeriodError:
+            summary["probe_invalid_periods"] += 1
+            continue
+        summary["verified_maximum_days"] = candidate_days
+        summary["windows"] = 1
+        summary["records"] = len(records)
+        return records
+    raise InvalidPeriodError("No accepted read-only period was found")
+
+
+def _execute_channel(
+    channel: str,
+    adapter: ChannelAdapter,
+    windows: Iterable[DateWindow],
+    writer: DatabaseWriter | None,
+    *,
+    probe_boundary: bool,
+    end: date,
+) -> dict[str, Any]:
+    summary = _empty_summary(channel)
+    starting_pages = adapter.pages_fetched
+    try:
+        records = (
+            _probe_boundary(channel, adapter, end, summary)
+            if probe_boundary
+            else _fetch_windows(adapter, windows, summary)
         )
+        if writer is not None:
+            written = writer.write(channel, records, uuid4())
+            summary.update(
+                inserted=written.inserted,
+                changed=written.changed,
+                skipped=written.skipped,
+            )
+    except Exception as error:
+        summary.update(status="failed", error_type=type(error).__name__)
+        raise ChannelRunFailure(summary) from None
+    finally:
+        summary["pages"] = adapter.pages_fetched - starting_pages
     return summary
 
 
@@ -150,6 +211,8 @@ def main(
         end = _parse_date(args.end)
         start = _parse_date(args.start) if args.command == "collect" else None
         _validate_dates(start or end, end, today or date.today())
+        if getattr(args, "probe_boundaries", False) and args.write_db:
+            raise CliUsageError("boundary probing is dry-run only")
     except CliUsageError as error:
         stderr.write(f"error: {error}\n")
         return 2
@@ -178,6 +241,7 @@ def main(
 
     channel_summaries: list[dict[str, Any]] = []
     failure_count = 0
+    close_failed = False
     try:
         for channel in channels:
             try:
@@ -188,30 +252,50 @@ def main(
                     maximum_window=args.command == "collect-all",
                 )
                 channel_summaries.append(
-                    _collect_channel(channel, adapters[channel], windows, writer)
+                    _execute_channel(
+                        channel,
+                        adapters[channel],
+                        windows,
+                        writer,
+                        probe_boundary=(
+                            getattr(args, "probe_boundaries", False)
+                            and channel in BOUNDARY_PROBE_START_DAYS
+                        ),
+                        end=end,
+                    )
                 )
-            except Exception as error:
+            except ChannelRunFailure as error:
                 failure_count += 1
-                failed = _empty_summary(channel)
-                failed.update(status="failed", error_type=type(error).__name__)
-                channel_summaries.append(failed)
+                channel_summaries.append(error.summary)
                 if not args.continue_on_error:
                     break
     finally:
         if connection is not None:
-            connection.close()
+            try:
+                connection.close()
+            except Exception:
+                close_failed = True
+                stderr.write("error: database connection close failed\n")
 
     success_count = sum(item["status"] == "ok" for item in channel_summaries)
-    status = "ok" if not failure_count else ("partial" if success_count else "failed")
-    _render(
-        {
-            "mode": "write-db" if args.write_db else "dry-run",
-            "status": status,
-            "channels": channel_summaries,
-        },
-        stdout,
+    status = (
+        "failed"
+        if close_failed
+        else "ok"
+        if not failure_count
+        else "partial"
+        if success_count
+        else "failed"
     )
-    return 1 if failure_count else 0
+    payload = {
+        "mode": "write-db" if args.write_db else "dry-run",
+        "status": status,
+        "channels": channel_summaries,
+    }
+    if close_failed:
+        payload["database_close"] = "failed"
+    _render(payload, stdout)
+    return 1 if failure_count or close_failed else 0
 
 
 if __name__ == "__main__":

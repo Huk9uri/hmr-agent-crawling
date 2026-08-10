@@ -35,6 +35,14 @@ MAXIMUM_WINDOW_DAYS = {
     "toss": 31,
 }
 
+# Highest read-only candidate attempted by --probe-boundaries. LotteON's
+# documented one-day limit is never exceeded.
+BOUNDARY_PROBE_START_DAYS = {
+    "godomall": 31,
+    "lotteon": 1,
+    "elevenst": 7,
+}
+
 
 def build_adapter_registry(config: AppConfig) -> dict[str, ChannelAdapter]:
     """Instantiate every adapter, failing if any channel credential is absent."""

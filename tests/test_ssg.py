@@ -45,12 +45,14 @@ def config():
 class SsgAdapterTests(unittest.TestCase):
     def test_fetch_posts_order_completion_window_and_maps_only_deployed_columns(self):
         http = FakeHttpClient(fixture("ssg_shipping_directions.json"))
+        adapter = SsgAdapter(config(), http=http)
 
         record = next(
-            SsgAdapter(config(), http=http).fetch(
+            adapter.fetch(
                 DateWindow(date(2026, 2, 12), date(2026, 8, 10))
             )
         )
+        self.assertEqual(adapter.pages_fetched, 1)
 
         self.assertEqual(
             http.calls,

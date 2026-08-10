@@ -7,7 +7,12 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from xml.etree import ElementTree
 
-from hmr_order_collection.channels.base import ChannelAdapter, DateWindow
+from hmr_order_collection.channels.base import (
+    ChannelAdapter,
+    DateWindow,
+    InvalidPeriodError,
+    explicit_invalid_period_message,
+)
 from hmr_order_collection.config import AppConfig
 from hmr_order_collection.http import HttpClient, parse_xml
 from hmr_order_collection.masking import canonical_payload
@@ -62,6 +67,7 @@ class ElevenstAdapter(ChannelAdapter):
             response = self._http.request(
                 "GET", f"{endpoint}/{start}/{end}", headers=dict(headers)
             )
+            self._record_page()
             root = parse_xml(response)
             _raise_for_business_error(root)
             for order_element, product_element in _order_products(root):
@@ -76,6 +82,9 @@ class ElevenstAdapter(ChannelAdapter):
 def _raise_for_business_error(root: ElementTree.Element) -> None:
     code = _first_text(root, ("resultCode", "code"))
     if code is not None and code not in {"0", "000", "0000", "200", "SUCCESS"}:
+        message = _first_text(root, ("message", "resultMessage", "errorMessage"))
+        if explicit_invalid_period_message(message):
+            raise InvalidPeriodError("11st rejected the requested period")
         raise ValueError("11st order response reported a business failure")
 
 

@@ -5,7 +5,7 @@ import unittest
 
 import requests
 
-from hmr_order_collection.channels.base import DateWindow
+from hmr_order_collection.channels.base import DateWindow, InvalidPeriodError
 from hmr_order_collection.channels.elevenst import ORDER_ENDPOINTS, ElevenstAdapter
 from hmr_order_collection.config import AppConfig
 from hmr_order_collection.database import TABLES
@@ -41,6 +41,19 @@ def config():
 
 
 class ElevenstAdapterTests(unittest.TestCase):
+    def test_explicit_invalid_period_response_raises_typed_probe_signal(self):
+        adapter = ElevenstAdapter(
+            config(), http=FakeHttpClient("elevenst_invalid_period.xml")
+        )
+
+        with self.assertRaises(InvalidPeriodError):
+            list(
+                adapter.fetch(
+                    DateWindow(date(2026, 8, 4), date(2026, 8, 10))
+                )
+            )
+        self.assertEqual(adapter.pages_fetched, 1)
+
     def test_namespaced_xml_emits_one_record_per_order_product_and_masks_raw_payload(self):
         http = FakeHttpClient("elevenst_namespaced_orders.xml")
 
@@ -56,8 +69,10 @@ class ElevenstAdapterTests(unittest.TestCase):
 
     def test_fetch_uses_only_read_only_order_endpoints_and_openapikey_header(self):
         http = FakeHttpClient()
+        adapter = ElevenstAdapter(config(), http=http)
 
-        self.assertEqual(list(ElevenstAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))), [])
+        self.assertEqual(list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))), [])
+        self.assertEqual(adapter.pages_fetched, 4)
 
         self.assertEqual(len(http.calls), len(ORDER_ENDPOINTS))
         self.assertTrue(all(call[0] == "GET" for call in http.calls))

@@ -86,6 +86,7 @@ class CoupangAdapterTests(unittest.TestCase):
         records = list(adapter.fetch(DateWindow(date(2026, 8, 1), date(2026, 8, 10))))
 
         self.assertEqual(records, [])
+        self.assertEqual(adapter.pages_fetched, 7)
         self.assertEqual(pages_by_status, {"ACCEPT": 2, "INSTRUCT": 1, "DEPARTURE": 1, "DELIVERING": 1, "FINAL_DELIVERY": 1, "NONE_TRACKING": 1})
         self.assertEqual(http.calls[0][2]["params"], {"createdAtFrom": "2026-08-01+09:00", "createdAtTo": "2026-08-10+09:00", "maxPerPage": 50, "status": "ACCEPT"})
         self.assertEqual(http.calls[1][2]["params"]["nextToken"], "SAME-TOKEN")

@@ -100,6 +100,7 @@ class TossShoppingAdapterTests(unittest.TestCase):
         )
         order_calls = [call for call in http.calls if call[1] == ORDERS_URL]
         self.assertEqual(len(order_calls), 6)
+        self.assertEqual(adapter.pages_fetched, 6)
         self.assertEqual(
             order_calls[0][2]["params"],
             {"startDate": "2026-07-11", "endDate": "2026-08-10", "limit": 50},

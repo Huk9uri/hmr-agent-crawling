@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <code>999</code>
+  <message>조회기간이 최대 범위를 초과했습니다</message>
+</response>

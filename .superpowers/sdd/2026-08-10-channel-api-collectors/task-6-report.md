@@ -76,3 +76,34 @@ order with its existing protected `.env` file:
   not guess a wider period.
 - The existing SSG ISO date serialization and 11st live XML variants remain
   explicitly assigned to credentialed dry-run verification.
+
+## Fix round 1/5: boundary probes, page counts, close safety, and lockfile
+
+Addressed all four Important findings and the Minor date-branch coverage from
+the first independent review without performing operational calls.
+
+- Added dry-run-only `--probe-boundaries` support to `collect-all`. Godomall
+  starts at 31 days, 11st at 7, and LotteON remains capped at the official one
+  day. Candidates decrease only after a typed `InvalidPeriodError` derived from
+  an explicit API business message; all other failures stop the channel.
+- Added safe probe outcome fields: `probe_attempts`,
+  `probe_invalid_periods`, and `verified_maximum_days`.
+- Added monotonic response-page instrumentation to all seven adapters. OAuth
+  token calls are excluded; every order/search/detail response increments only
+  a numeric counter. Normal and failed summaries now include `pages`.
+- Sanitized SQL connection close failures. The original per-channel failure
+  summary is preserved, a fixed stderr line and `database_close: failed` are
+  emitted, and the CLI returns exit code 1 without exposing driver text.
+- Added `requirements.lock`, generated for Python 3.12 with every transitive
+  version and available artifact hash pinned. Documented installation uses
+  `pip --require-hashes`.
+- Added focused invalid-ISO and `--from > --to` validation tests plus synthetic
+  typed-invalid-period fixtures for Godomall, LotteON, and 11st.
+
+### RED/GREEN evidence
+
+- RED: focused tests failed because the typed period signal/classifier, page
+  counters, CLI probe fields, and protected close path did not exist.
+- GREEN: focused CLI/window/all-adapter suite passed 62 tests.
+- Full hash-locked Python 3.12 suite passed all 72 tests.
+- Live API and production DB verification remain deferred to the controller.

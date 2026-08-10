@@ -8,21 +8,40 @@ import json
 from types import MappingProxyType
 import unittest
 
-from hmr_order_collection.channels.base import DateWindow
+from hmr_order_collection.channels.base import ChannelAdapter, DateWindow, InvalidPeriodError
 from hmr_order_collection.config import AppConfig, ConfigurationError
 from hmr_order_collection.database import WriteSummary
 
 
-class FakeAdapter:
-    def __init__(self, *, record_count=0, error=None):
+class FakeAdapter(ChannelAdapter):
+    def __init__(self, *, record_count=0, error=None, page_count=1):
         self.record_count = record_count
         self.error = error
+        self.page_count = page_count
         self.windows = []
 
     def fetch(self, window):
         self.windows.append(window)
+        for _ in range(self.page_count):
+            self._record_page()
         if self.error is not None:
             raise self.error
+        return iter([object()] * self.record_count)
+
+
+class BoundaryAdapter(FakeAdapter):
+    def __init__(self, maximum_accepted_days, *, record_count=0, error=None):
+        super().__init__(record_count=record_count, error=error)
+        self.maximum_accepted_days = maximum_accepted_days
+
+    def fetch(self, window):
+        self.windows.append(window)
+        self._record_page()
+        if self.error is not None:
+            raise self.error
+        inclusive_days = (window.end - window.start).days + 1
+        if inclusive_days > self.maximum_accepted_days:
+            raise InvalidPeriodError("synthetic invalid period detail must not be emitted")
         return iter([object()] * self.record_count)
 
 
@@ -38,11 +57,14 @@ class FakeWriter:
 
 
 class FakeConnection:
-    def __init__(self):
+    def __init__(self, close_error=None):
         self.closed = False
+        self.close_error = close_error
 
     def close(self):
         self.closed = True
+        if self.close_error is not None:
+            raise self.close_error
 
 
 def config(values=None):
@@ -143,8 +165,29 @@ class CliTests(unittest.TestCase):
         self.assertIn("future", error.lower())
         self.assertEqual(calls, {"config": 0, "registry": 0, "connection": 0})
 
+    def test_invalid_iso_date_is_rejected_with_sanitized_usage_error(self):
+        code, output, error, calls, _writer, _connection = self.invoke(
+            ["collect", "--channel", "naver", "--from", "not-a-date", "--to", "2026-08-10"]
+        )
+
+        self.assertEqual(code, 2)
+        self.assertIsNone(output)
+        self.assertEqual(error, "error: dates must use YYYY-MM-DD\n")
+        self.assertNotIn("not-a-date", error)
+        self.assertEqual(calls, {"config": 0, "registry": 0, "connection": 0})
+
+    def test_from_after_to_is_rejected_before_configuration(self):
+        code, output, error, calls, _writer, _connection = self.invoke(
+            ["collect", "--channel", "naver", "--from", "2026-08-10", "--to", "2026-08-09"]
+        )
+
+        self.assertEqual(code, 2)
+        self.assertIsNone(output)
+        self.assertEqual(error, "error: from date must not be after to date\n")
+        self.assertEqual(calls, {"config": 0, "registry": 0, "connection": 0})
+
     def test_dry_run_is_default_and_never_opens_a_database_connection(self):
-        adapter = FakeAdapter(record_count=2)
+        adapter = FakeAdapter(record_count=2, page_count=3)
         code, output, error, calls, writer, connection = self.invoke(
             [
                 "collect",
@@ -162,6 +205,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(error, "")
         self.assertEqual(output["mode"], "dry-run")
         self.assertEqual(output["channels"][0]["records"], 2)
+        self.assertEqual(output["channels"][0]["pages"], 3)
         self.assertEqual(calls["connection"], 0)
         self.assertEqual(writer.calls, [])
         self.assertFalse(connection.closed)
@@ -214,6 +258,37 @@ class CliTests(unittest.TestCase):
         self.assertEqual(writer.calls, [])
         self.assertFalse(connection.closed)
 
+    def test_database_close_failure_is_sanitized_and_preserves_channel_failure(self):
+        connection = FakeConnection(
+            close_error=RuntimeError("db.internal collector synthetic-password")
+        )
+        adapter = FakeAdapter(error=ValueError("primary secret-bearing failure"))
+        code, output, error, _calls, _writer, returned_connection = self.invoke(
+            [
+                "collect",
+                "--channel",
+                "naver",
+                "--from",
+                "2026-08-10",
+                "--to",
+                "2026-08-10",
+                "--write-db",
+            ],
+            adapters={"naver": adapter},
+            connection=connection,
+        )
+
+        self.assertEqual(code, 1)
+        self.assertEqual(error, "error: database connection close failed\n")
+        self.assertEqual(output["status"], "failed")
+        self.assertEqual(output["database_close"], "failed")
+        self.assertEqual(output["channels"][0]["error_type"], "ValueError")
+        rendered = json.dumps(output) + error
+        self.assertNotIn("db.internal", rendered)
+        self.assertNotIn("synthetic-password", rendered)
+        self.assertNotIn("primary secret-bearing failure", rendered)
+        self.assertTrue(returned_connection.closed)
+
     def test_maximum_window_ends_on_explicit_to_date_for_every_channel(self):
         from hmr_order_collection.channels import CHANNEL_NAMES, MAXIMUM_WINDOW_DAYS
 
@@ -239,6 +314,93 @@ class CliTests(unittest.TestCase):
             self.assertEqual(MAXIMUM_WINDOW_DAYS[channel], (date(2026, 8, 10) - expected_starts[channel]).days + 1)
             self.assertEqual(adapter.windows, [DateWindow(expected_starts[channel], date(2026, 8, 10))])
 
+    def test_boundary_probe_reduces_only_explicit_invalid_periods_and_reports_safe_counts(self):
+        adapter = BoundaryAdapter(maximum_accepted_days=28, record_count=2)
+        code, output, error, calls, _writer, _connection = self.invoke(
+            [
+                "collect-all",
+                "--to",
+                "2026-08-10",
+                "--maximum-window",
+                "--probe-boundaries",
+                "--dry-run",
+            ],
+            adapters={"godomall": adapter},
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(error, "")
+        summary = output["channels"][0]
+        self.assertEqual(summary["probe_attempts"], 4)
+        self.assertEqual(summary["probe_invalid_periods"], 3)
+        self.assertEqual(summary["verified_maximum_days"], 28)
+        self.assertEqual(summary["pages"], 4)
+        self.assertEqual(summary["records"], 2)
+        self.assertEqual(
+            [(window.end - window.start).days + 1 for window in adapter.windows],
+            [31, 30, 29, 28],
+        )
+        self.assertEqual(calls["connection"], 0)
+
+    def test_boundary_probe_never_exceeds_lotteon_official_one_day_limit(self):
+        adapter = BoundaryAdapter(maximum_accepted_days=1)
+        code, output, error, _calls, _writer, _connection = self.invoke(
+            [
+                "collect-all",
+                "--to",
+                "2026-08-10",
+                "--maximum-window",
+                "--probe-boundaries",
+            ],
+            adapters={"lotteon": adapter},
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(error, "")
+        self.assertEqual(output["channels"][0]["verified_maximum_days"], 1)
+        self.assertEqual(
+            adapter.windows, [DateWindow(date(2026, 8, 10), date(2026, 8, 10))]
+        )
+
+    def test_boundary_probe_does_not_reduce_on_non_period_failure(self):
+        adapter = BoundaryAdapter(
+            maximum_accepted_days=28,
+            error=RuntimeError("authentication failure detail"),
+        )
+        code, output, error, _calls, _writer, _connection = self.invoke(
+            [
+                "collect-all",
+                "--to",
+                "2026-08-10",
+                "--maximum-window",
+                "--probe-boundaries",
+                "--continue-on-error",
+            ],
+            adapters={"godomall": adapter},
+        )
+
+        self.assertEqual(code, 1)
+        self.assertEqual(error, "")
+        self.assertEqual(len(adapter.windows), 1)
+        self.assertEqual(output["channels"][0]["error_type"], "RuntimeError")
+
+    def test_boundary_probe_is_rejected_in_write_mode(self):
+        code, output, error, calls, _writer, _connection = self.invoke(
+            [
+                "collect-all",
+                "--to",
+                "2026-08-10",
+                "--maximum-window",
+                "--probe-boundaries",
+                "--write-db",
+            ]
+        )
+
+        self.assertEqual(code, 2)
+        self.assertIsNone(output)
+        self.assertEqual(error, "error: boundary probing is dry-run only\n")
+        self.assertEqual(calls, {"config": 0, "registry": 0, "connection": 0})
+
     def test_continue_on_error_isolates_failures_and_summary_never_leaks_error_values(self):
         adapters = {
             "naver": FakeAdapter(error=RuntimeError("SECRET_TOKEN Alice 010-1234-5678")),
@@ -263,6 +425,7 @@ class CliTests(unittest.TestCase):
             "channel": "naver",
             "status": "failed",
             "windows": 0,
+            "pages": 1,
             "records": 0,
             "inserted": 0,
             "changed": 0,
