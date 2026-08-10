@@ -37,3 +37,23 @@ Implemented with test-first RED/GREEN coverage. All response fixtures and creden
 - SSG's JSON list notation is not explicit about whether `shppDirection` is wrapped per list element. The parser accepts both the documented wrapper shape and direct row objects while rejecting malformed rows.
 - Toss access tokens are cached only in memory and are never serialized. The adapter refreshes at least 30 seconds before normal expiry, or halfway through unusually short valid lifetimes.
 - No live boundary probe, customer response, token, or seller credential was used in Task 5. Production access and response variants remain for the explicitly planned Task 6 dry run.
+
+## Fix round 1/5: identity, token freshness, and response-shape safety
+
+Addressed all three Important review findings without expanding endpoint or persistence scope.
+
+- SSG now validates every raw `ordNo`, `ordItemSeq`, `shppNo`, and `shppSeq` component before string conversion. Missing, `null`, and empty values raise a collection error instead of producing false identities such as `"None"` or `""`.
+- Toss now resolves the cached access token immediately before every cursor-page request. If the injected clock crosses the proactive refresh boundary between pages, the next page uses a newly issued bearer token.
+- Toss now requires `success.results` to be an actual list. `null`, `false`, an empty object, and an empty string are rejected as malformed responses; only `[]` is accepted as a successful zero-result page.
+- Added one synthetic SSG fixture with independent invalid cases for all four identity components and three regression tests covering the reviewed behaviors.
+
+### RED evidence
+
+The three new tests ran before production changes and produced the expected nine failing subcases: four invalid SSG identity components were accepted, the second Toss cursor page reused the first token, and four falsy non-list `results` values were treated as empty lists.
+
+### GREEN evidence
+
+- Reviewed regressions: all 3 tests passed.
+- Focused SSG/Toss suite: all 12 tests passed.
+- Dependency-complete full suite: all 48 tests passed in 0.107 seconds.
+- `git diff --check`: passed before report update; the staged check is repeated before commit.

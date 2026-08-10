@@ -141,6 +141,24 @@ class SsgAdapterTests(unittest.TestCase):
                 )
             )
 
+    def test_fetch_rejects_null_or_empty_identity_components(self):
+        cases = fixture("ssg_invalid_identities.json")["invalidRows"]
+
+        for case in cases:
+            with self.subTest(component=case["component"]):
+                payload = {
+                    "resultCode": "00",
+                    "resultMessage": "SUCCESS",
+                    "resultDesc": "synthetic success",
+                    "shppDirections": [{"shppDirection": case["row"]}],
+                }
+                with self.assertRaisesRegex(ValueError, "identity"):
+                    list(
+                        SsgAdapter(config(), http=FakeHttpClient(payload)).fetch(
+                            DateWindow(date(2026, 8, 10), date(2026, 8, 10))
+                        )
+                    )
+
     def test_fetch_rejects_windows_longer_than_180_inclusive_days_before_http(self):
         http = FakeHttpClient({})
 

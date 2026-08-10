@@ -56,8 +56,6 @@ class TossShoppingAdapter(ChannelAdapter):
         if inclusive_days < 1 or inclusive_days > 31:
             raise ValueError("Toss Shopping order windows must contain between 1 and 31 days")
 
-        token = self._access_token()
-        headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
         params: dict[str, Any] = {
             "startDate": window.start.isoformat(),
             "endDate": window.end.isoformat(),
@@ -65,8 +63,12 @@ class TossShoppingAdapter(ChannelAdapter):
         }
         seen_cursors: set[str] = set()
         while True:
+            token = self._access_token()
             response = self._http.request(
-                "GET", ORDERS_URL, headers=dict(headers), params=dict(params)
+                "GET",
+                ORDERS_URL,
+                headers={"Accept": "application/json", "Authorization": f"Bearer {token}"},
+                params=dict(params),
             )
             payload = parse_json(response)
             if not isinstance(payload, dict):
@@ -76,7 +78,7 @@ class TossShoppingAdapter(ChannelAdapter):
             success = payload.get("success")
             if not isinstance(success, dict):
                 raise ValueError("Toss Shopping success response was malformed")
-            results = success.get("results") or []
+            results = success.get("results")
             if not isinstance(results, list) or any(not isinstance(row, dict) for row in results):
                 raise ValueError("Toss Shopping order list was malformed")
             for row in results:

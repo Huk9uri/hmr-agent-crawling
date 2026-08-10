@@ -92,14 +92,17 @@ def _shipping_directions(value: Any) -> list[dict[str, Any]]:
 
 def _map_record(row: dict[str, Any]) -> ChannelRecord:
     try:
-        identity = (
-            str(row["ordNo"]),
-            str(row["ordItemSeq"]),
-            str(row["shppNo"]),
-            str(row["shppSeq"]),
+        raw_identity = (
+            row["ordNo"],
+            row["ordItemSeq"],
+            row["shppNo"],
+            row["shppSeq"],
         )
     except KeyError as error:
         raise ValueError("SSG row lacked order/shipping identity") from error
+    if any(value is None or value == "" for value in raw_identity):
+        raise ValueError("SSG row lacked order/shipping identity")
+    identity = tuple(str(value) for value in raw_identity)
     order_status = _optional_str(row.get("ordStatCd"))
     shipping_status = _optional_str(row.get("shppStatCd"))
     shipping_progress = _optional_str(row.get("shppProgStatDtlCd"))

@@ -109,6 +109,40 @@ class TossShoppingAdapterTests(unittest.TestCase):
         self.assertEqual(order_calls[-1][2]["headers"]["Authorization"], "Bearer SYNTHETIC_TOKEN_2")
         self.assertTrue(all(call[0] == "GET" for call in order_calls))
 
+    def test_fetch_refreshes_token_that_becomes_stale_between_cursor_pages(self):
+        now = [1000.0]
+        token_count = 0
+        order_authorizations = []
+
+        def handler(method, url, kwargs):
+            nonlocal token_count
+            if url == TOKEN_URL:
+                token_count += 1
+                return {"access_token": f"PAGE_TOKEN_{token_count}", "expires_in": 60}
+            order_authorizations.append(kwargs["headers"]["Authorization"])
+            if "nextCursor" not in kwargs["params"]:
+                now[0] = 1030.0
+                return {
+                    "resultType": "SUCCESS",
+                    "success": {"results": [], "nextCursor": "CURSOR-1"},
+                }
+            return {
+                "resultType": "SUCCESS",
+                "success": {"results": [], "nextCursor": None},
+            }
+
+        adapter = TossShoppingAdapter(
+            config(), http=FakeHttpClient(handler), clock=lambda: now[0]
+        )
+
+        list(adapter.fetch(DateWindow(date(2026, 8, 1), date(2026, 8, 10))))
+
+        self.assertEqual(token_count, 2)
+        self.assertEqual(
+            order_authorizations,
+            ["Bearer PAGE_TOKEN_1", "Bearer PAGE_TOKEN_2"],
+        )
+
     def test_order_maps_only_deployed_columns_and_masks_documented_private_fields(self):
         page = fixture("toss_orders_page.json")
 
@@ -217,6 +251,26 @@ class TossShoppingAdapterTests(unittest.TestCase):
                     DateWindow(date(2026, 8, 1), date(2026, 8, 10))
                 )
             )
+
+    def test_fetch_rejects_falsy_non_list_results_as_malformed(self):
+        malformed_values = (None, False, {}, "")
+
+        for malformed in malformed_values:
+            with self.subTest(results=malformed):
+                def handler(method, url, kwargs):
+                    if url == TOKEN_URL:
+                        return {"access_token": "SYNTHETIC_TOKEN", "expires_in": 3600}
+                    return {
+                        "resultType": "SUCCESS",
+                        "success": {"results": malformed, "nextCursor": None},
+                    }
+
+                with self.assertRaisesRegex(ValueError, "order list"):
+                    list(
+                        TossShoppingAdapter(
+                            config(), http=FakeHttpClient(handler), clock=lambda: 1000.0
+                        ).fetch(DateWindow(date(2026, 8, 1), date(2026, 8, 10)))
+                    )
 
     def test_fetch_raises_on_repeated_next_cursor_instead_of_returning_partial_success(self):
         def handler(method, url, kwargs):
