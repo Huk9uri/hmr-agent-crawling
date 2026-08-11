@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from types import MappingProxyType
 import unittest
@@ -84,6 +85,10 @@ class GodomallAdapterTests(unittest.TestCase):
         self.assertEqual(set(record.columns), set(TABLES["godomall"].columns))
         self.assertEqual(record.columns["OrderChannelCode"], "naverpay")
         self.assertEqual(record.columns["ExternalOrderNo"], "GODO-EXTERNAL-002")
+        self.assertEqual(record.columns["OrderTypeCode"], "order")
+        self.assertEqual(record.columns["SettlementMethodCode"], "pc")
+        self.assertEqual(record.columns["TotalGoodsPrice"], Decimal("23800"))
+        self.assertEqual(record.columns["OptionPrice"], Decimal("1000"))
         self.assertEqual(record.columns["ProductCode"], "GODO-PRODUCT-002")
         self.assertEqual(record.columns["Quantity"], 2)
         self.assertEqual(record.columns["PaidAt"], "2026-08-10 11:01:00")

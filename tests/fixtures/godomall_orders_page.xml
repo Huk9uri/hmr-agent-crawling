@@ -10,10 +10,19 @@
       <orderNo>GODO-ORDER-002</orderNo>
       <orderChannelFl>naverpay</orderChannelFl>
       <apiOrderNo>GODO-EXTERNAL-002</apiOrderNo>
+      <orderTypeFl>order</orderTypeFl>
+      <settleKind>pc</settleKind>
       <orderStatus>g1</orderStatus>
       <orderDate>2026-08-10 11:00:00</orderDate>
       <paymentDt>2026-08-10 11:01:00</paymentDt>
       <settlePrice>23800</settlePrice>
+      <totalGoodsPrice>23800</totalGoodsPrice>
+      <totalOrderDcPrice>500</totalOrderDcPrice>
+      <totalMemberDcPrice>300</totalMemberDcPrice>
+      <totalCouponGoodsDcPrice>400</totalCouponGoodsDcPrice>
+      <totalCouponOrderDcPrice>200</totalCouponOrderDcPrice>
+      <totalMileage>100</totalMileage>
+      <totalDeposit>0</totalDeposit>
       <totalGoodsDcPrice>1200</totalGoodsDcPrice>
       <totalDeliveryCharge>3000</totalDeliveryCharge>
       <orderInfoData>
@@ -32,6 +41,10 @@
           <optionInfo>Two portions</optionInfo>
           <goodsCnt>2</goodsCnt>
           <goodsPrice>11900</goodsPrice>
+          <optionPrice>1000</optionPrice>
+          <addGoodsPrice>0</addGoodsPrice>
+          <goodsDcPrice>600</goodsDcPrice>
+          <couponGoodsDcPrice>200</couponGoodsDcPrice>
           <orderStatus>g1</orderStatus>
           <invoiceCompanySno>CJGLS</invoiceCompanySno>
           <invoiceNo>SYNTHETIC-TRACKING-002</invoiceNo>

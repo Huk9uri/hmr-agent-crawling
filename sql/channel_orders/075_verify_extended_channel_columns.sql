@@ -24,7 +24,19 @@ VALUES
 (N'NAVER_SMARTSTORE_ORDER_ITEM', N'PlaceOrderStatus', N'nvarchar'),
 (N'NAVER_SMARTSTORE_ORDER_ITEM', N'ExpectedDeliveryMethod', N'nvarchar'),
 (N'NAVER_SMARTSTORE_ORDER_ITEM', N'DeliveryAttributeType', N'nvarchar'),
-(N'NAVER_SMARTSTORE_ORDER_ITEM', N'DeliveryMethod', N'nvarchar');
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'DeliveryMethod', N'nvarchar'),
+(N'GODOMALL_ORDER_ITEM', N'OrderTypeCode', N'nvarchar'),
+(N'GODOMALL_ORDER_ITEM', N'SettlementMethodCode', N'nvarchar'),
+(N'GODOMALL_ORDER_ITEM', N'OptionPrice', N'decimal'),
+(N'GODOMALL_ORDER_ITEM', N'AdditionalGoodsPrice', N'decimal'),
+(N'GODOMALL_ORDER_ITEM', N'GoodsDiscountAmount', N'decimal'),
+(N'GODOMALL_ORDER_ITEM', N'CouponGoodsDiscountAmount', N'decimal'),
+(N'GODOMALL_ORDER_ITEM', N'TotalGoodsPrice', N'decimal'),
+(N'GODOMALL_ORDER_ITEM', N'OrderDiscountAmount', N'decimal'),
+(N'GODOMALL_ORDER_ITEM', N'MemberDiscountAmount', N'decimal'),
+(N'GODOMALL_ORDER_ITEM', N'CouponOrderDiscountAmount', N'decimal'),
+(N'GODOMALL_ORDER_ITEM', N'UsedMileageAmount', N'decimal'),
+(N'GODOMALL_ORDER_ITEM', N'UsedDepositAmount', N'decimal');
 
 DECLARE @Problems nvarchar(max);
 

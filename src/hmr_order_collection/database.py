@@ -39,7 +39,7 @@ TABLES: dict[str, TableDefinition] = {
     "godomall": TableDefinition(
         "GODOMALL_ORDER_ITEM",
         ("OrderNo", "OrderItemSno"),
-        ("OrderNo", "OrderItemSno", "OrderChannelCode", "ExternalOrderNo", "ProductCode", "OptionCode", "ProductName", "OptionName", "Quantity", "UnitPrice", "PaymentAmount", "DiscountAmount", "DeliveryFee", "OrderStatus", "PaymentStatus", "DeliveryStatus", "OrderedAt", "PaidAt", "DispatchedAt", "DeliveryCompanyCode", "TrackingNumber", "RawOrderStatus", "RawDeliveryStatus"),
+        ("OrderNo", "OrderItemSno", "OrderChannelCode", "ExternalOrderNo", "OrderTypeCode", "SettlementMethodCode", "ProductCode", "OptionCode", "ProductName", "OptionName", "Quantity", "UnitPrice", "OptionPrice", "AdditionalGoodsPrice", "GoodsDiscountAmount", "CouponGoodsDiscountAmount", "PaymentAmount", "TotalGoodsPrice", "OrderDiscountAmount", "MemberDiscountAmount", "CouponOrderDiscountAmount", "UsedMileageAmount", "UsedDepositAmount", "DiscountAmount", "DeliveryFee", "OrderStatus", "PaymentStatus", "DeliveryStatus", "OrderedAt", "PaidAt", "DispatchedAt", "DeliveryCompanyCode", "TrackingNumber", "RawOrderStatus", "RawDeliveryStatus"),
     ),
     "coupang": TableDefinition(
         "COUPANG_ORDER_ITEM",

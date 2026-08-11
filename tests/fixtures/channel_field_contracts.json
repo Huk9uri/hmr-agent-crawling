@@ -18,5 +18,9 @@
   {"channel":"naver","response_path":"productOrder.placeOrderStatus","column":"PlaceOrderStatus","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
   {"channel":"naver","response_path":"productOrder.expectedDeliveryMethod","column":"ExpectedDeliveryMethod","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
   {"channel":"naver","response_path":"productOrder.deliveryAttributeType","column":"DeliveryAttributeType","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
-  {"channel":"naver","response_path":"delivery.deliveryMethod","column":"DeliveryMethod","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"}
+  {"channel":"naver","response_path":"delivery.deliveryMethod","column":"DeliveryMethod","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"godomall","response_path":"order.orderTypeFl","column":"OrderTypeCode","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"live"},
+  {"channel":"godomall","response_path":"order.settleKind","column":"SettlementMethodCode","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"live"},
+  {"channel":"godomall","response_path":"order.totalGoodsPrice","column":"TotalGoodsPrice","sql_type":"decimal(19,4)","nullable":true,"classification":"stored","evidence":"live"},
+  {"channel":"godomall","response_path":"orderItem.optionPrice","column":"OptionPrice","sql_type":"decimal(19,4)","nullable":true,"classification":"stored","evidence":"live"}
 ]
