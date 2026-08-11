@@ -10,7 +10,21 @@ DECLARE @Expected table
 );
 
 INSERT @Expected (TableName, ColumnName, DataType)
-VALUES (N'NAVER_SMARTSTORE_ORDER_ITEM', N'OrderDate', N'datetime2');
+VALUES
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'OrderDate', N'datetime2'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'PaymentMeans', N'nvarchar'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'PayLocationType', N'nvarchar'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'OrderDiscountAmount', N'decimal'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'GeneralPaymentAmount', N'decimal'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'OptionManageCode', N'nvarchar'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'DeliveryFeeAmount', N'decimal'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'SectionDeliveryFee', N'decimal'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'ShippingDueDate', N'datetime2'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'PlaceOrderDate', N'datetime2'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'PlaceOrderStatus', N'nvarchar'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'ExpectedDeliveryMethod', N'nvarchar'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'DeliveryAttributeType', N'nvarchar'),
+(N'NAVER_SMARTSTORE_ORDER_ITEM', N'DeliveryMethod', N'nvarchar');
 
 DECLARE @Problems nvarchar(max);
 

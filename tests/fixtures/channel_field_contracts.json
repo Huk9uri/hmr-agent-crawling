@@ -5,5 +5,18 @@
   {"channel":"lotteon","response_path":"deliveryOrder.odNo","column":"OrderNo","sql_type":"nvarchar(100)","nullable":false,"classification":"stored","evidence":"live"},
   {"channel":"elevenst","response_path":"order.orderNo","column":"OrderNo","sql_type":"nvarchar(100)","nullable":false,"classification":"stored","evidence":"live"},
   {"channel":"ssg","response_path":"shppDirection.ordNo","column":"OrdNo","sql_type":"nvarchar(100)","nullable":false,"classification":"stored","evidence":"live"},
-  {"channel":"toss","response_path":"orderProduct.orderProductId","column":"OrderProductId","sql_type":"bigint","nullable":false,"classification":"stored","evidence":"official"}
+  {"channel":"toss","response_path":"orderProduct.orderProductId","column":"OrderProductId","sql_type":"bigint","nullable":false,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"order.paymentMeans","column":"PaymentMeans","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"order.payLocationType","column":"PayLocationType","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"order.orderDiscountAmount","column":"OrderDiscountAmount","sql_type":"decimal(19,4)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"order.generalPaymentAmount","column":"GeneralPaymentAmount","sql_type":"decimal(19,4)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"productOrder.optionManageCode","column":"OptionManageCode","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"productOrder.deliveryFeeAmount","column":"DeliveryFeeAmount","sql_type":"decimal(19,4)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"productOrder.sectionDeliveryFee","column":"SectionDeliveryFee","sql_type":"decimal(19,4)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"productOrder.shippingDueDate","column":"ShippingDueDate","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"productOrder.placeOrderDate","column":"PlaceOrderDate","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"productOrder.placeOrderStatus","column":"PlaceOrderStatus","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"productOrder.expectedDeliveryMethod","column":"ExpectedDeliveryMethod","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"productOrder.deliveryAttributeType","column":"DeliveryAttributeType","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"naver","response_path":"delivery.deliveryMethod","column":"DeliveryMethod","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"}
 ]
