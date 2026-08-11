@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-08-10T12:00:00.000+09:00",
+  "traceId": "SYNTHETIC_TRACE_NAVER_CHANGED",
+  "data": {
+    "count": 1,
+    "lastChangeStatuses": [
+      {
+        "orderId": "NAVER-ORDER-001",
+        "productOrderId": "NAVER-PRODUCT-ORDER-001",
+        "productOrderStatus": "DELIVERED",
+        "lastChangedDate": "2026-08-10T11:59:00.000+09:00",
+        "lastChangedType": "DISPATCHED",
+        "receiverAddressChanged": false
+      }
+    ]
+  }
+}

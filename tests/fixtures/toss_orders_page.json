@@ -1,0 +1,48 @@
+{
+  "resultType": "SUCCESS",
+  "success": {
+    "results": [
+      {
+        "orderedAt": "2026-08-09T10:00:00.000Z",
+        "canceledAt": null,
+        "confirmedAt": "2026-08-10T03:00:00.000Z",
+        "shippingDeadlineAt": "2026-08-11T00:00:00.000Z",
+        "orderId": 10001,
+        "orderProductId": 20001,
+        "productId": 30001,
+        "stockId": 40001,
+        "ordererName": "SYNTHETIC_TOSS_ORDERER_NAME_TO_MASK",
+        "ordererPhone": "SYNTHETIC_TOSS_ORDERER_PHONE_TO_MASK",
+        "ordererRealPhone": "SYNTHETIC_TOSS_ORDERER_REAL_PHONE_TO_MASK",
+        "receiverName": "SYNTHETIC_TOSS_RECEIVER_NAME_TO_MASK",
+        "receiverPhone": "SYNTHETIC_TOSS_RECEIVER_PHONE_TO_MASK",
+        "receiverRealPhone": "SYNTHETIC_TOSS_RECEIVER_REAL_PHONE_TO_MASK",
+        "address": "SYNTHETIC_TOSS_ADDRESS_TO_MASK",
+        "detailAddress": "SYNTHETIC_TOSS_DETAIL_ADDRESS_TO_MASK",
+        "zipCode": "SYNTHETIC_TOSS_ZIP_TO_MASK",
+        "shippingNote": "SYNTHETIC_TOSS_SHIPPING_NOTE_TO_MASK",
+        "productName": "Synthetic meal kit",
+        "optionName": "Two portions",
+        "quantity": 2,
+        "price": 12000,
+        "originPrice": 15000,
+        "totalDiscountPrice": 3000,
+        "tossShoppingDiscount": 1500,
+        "tossPayDiscount": 1000,
+        "tossPayPoint": 500,
+        "orderProductStatus": "DELIVERED",
+        "deliveryCompanyCode": "CJGLS",
+        "shippingTrackingNumber": "SYNTHETIC-TOSS-TRACKING-001",
+        "deliveryFeeGroupId": 50001,
+        "deliveryFee": 3000,
+        "deliveryLocationType": "NORMAL",
+        "normalDeliveryFee": 3000,
+        "jejuDeliveryFee": 5000,
+        "mountainDeliveryFee": 5000,
+        "productManagementCode": "TOSS-PRODUCT-001",
+        "productItemManagementCode": "TOSS-OPTION-001"
+      }
+    ],
+    "nextCursor": "SYNTHETIC-NEXT-CURSOR"
+  }
+}

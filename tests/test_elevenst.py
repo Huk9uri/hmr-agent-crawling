@@ -1,0 +1,150 @@
+from datetime import date
+from pathlib import Path
+from types import MappingProxyType
+import unittest
+
+import requests
+
+from hmr_order_collection.channels.base import DateWindow, InvalidPeriodError
+from hmr_order_collection.channels.elevenst import ORDER_ENDPOINTS, ElevenstAdapter
+from hmr_order_collection.config import AppConfig
+from hmr_order_collection.database import TABLES
+
+
+FIXTURES = Path(__file__).with_name("fixtures")
+
+
+def response(name, url, *, wire_encoding=None):
+    result = requests.Response()
+    result.status_code = 200
+    result.url = url
+    path = FIXTURES / name
+    result._content = (
+        path.read_bytes()
+        if wire_encoding is None
+        else path.read_text(encoding="utf-8").encode(wire_encoding)
+    )
+    return result
+
+
+class FakeHttpClient:
+    def __init__(self, fixtures=("elevenst_empty.xml",), *, fixture_encodings=None):
+        if isinstance(fixtures, str):
+            fixtures = (fixtures,)
+        self.fixtures = fixtures
+        self.fixture_encodings = fixture_encodings or {}
+        self.calls = []
+
+    def request(self, method, url, **kwargs):
+        self.calls.append((method, url, kwargs))
+        index = len(self.calls) - 1
+        fixture = self.fixtures[index] if index < len(self.fixtures) else "elevenst_empty.xml"
+        return response(
+            fixture,
+            url,
+            wire_encoding=self.fixture_encodings.get(fixture),
+        )
+
+
+def config():
+    return AppConfig(MappingProxyType({"ELEVENST_API_KEY": "SYNTHETIC_ELEVENST_KEY"}))
+
+
+class ElevenstAdapterTests(unittest.TestCase):
+    def test_fetch_decodes_euc_kr_declared_namespaced_xml_bytes(self):
+        fixture_name = "elevenst_euc_kr_orders.xml"
+        http = FakeHttpClient(
+            fixture_name,
+            fixture_encodings={fixture_name: "euc-kr"},
+        )
+
+        try:
+            records = list(
+                ElevenstAdapter(config(), http=http).fetch(
+                    DateWindow(date(2026, 8, 10), date(2026, 8, 10))
+                )
+            )
+        except ValueError as error:
+            self.fail(f"EUC-KR XML bytes were not decoded before parsing: {error}")
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(
+            records[0].identity,
+            ("ELEVENST-EUC-KR-ORDER-001", "ELEVENST-EUC-KR-ITEM-001"),
+        )
+        self.assertEqual(records[0].columns["ProductName"], "합성 김치볶음밥")
+
+    def test_explicit_invalid_period_response_raises_typed_probe_signal(self):
+        adapter = ElevenstAdapter(
+            config(), http=FakeHttpClient("elevenst_invalid_period.xml")
+        )
+
+        with self.assertRaises(InvalidPeriodError):
+            list(
+                adapter.fetch(
+                    DateWindow(date(2026, 8, 4), date(2026, 8, 10))
+                )
+            )
+        self.assertEqual(adapter.pages_fetched, 1)
+
+    def test_namespaced_xml_emits_one_record_per_order_product_and_masks_raw_payload(self):
+        http = FakeHttpClient("elevenst_namespaced_orders.xml")
+
+        records = list(ElevenstAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
+
+        self.assertEqual([record.identity for record in records], [("ELEVENST-ORDER-001", "ELEVENST-ITEM-001"), ("ELEVENST-ORDER-001", "ELEVENST-ITEM-002")])
+        self.assertTrue(all(set(record.columns) == set(TABLES["elevenst"].columns) for record in records))
+        self.assertEqual(records[0].columns["ProductId"], "ELEVENST-PRODUCT-001")
+        self.assertEqual(records[0].columns["Quantity"], 2)
+        self.assertNotIn("SYNTHETIC_NAME_TO_MASK", records[0].raw_json)
+        self.assertNotIn("SYNTHETIC_ABBREVIATED_NAME_TO_MASK", records[0].raw_json)
+        self.assertNotIn("010-0000-0000", records[0].raw_json)
+
+    def test_fetch_uses_only_read_only_order_endpoints_and_openapikey_header(self):
+        http = FakeHttpClient()
+        adapter = ElevenstAdapter(config(), http=http)
+
+        self.assertEqual(list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))), [])
+        self.assertEqual(adapter.pages_fetched, 2)
+
+        self.assertEqual(len(http.calls), len(ORDER_ENDPOINTS))
+        self.assertTrue(all(call[0] == "GET" for call in http.calls))
+        self.assertTrue(all(call[2]["headers"] == {"Accept": "application/xml", "openapikey": "SYNTHETIC_ELEVENST_KEY"} for call in http.calls))
+        self.assertEqual(
+            [call[1] for call in http.calls],
+            [f"{endpoint}/202608100000/202608102359" for endpoint in ORDER_ENDPOINTS],
+        )
+
+    def test_fetch_formats_each_window_bound_as_date_hour_minute(self):
+        http = FakeHttpClient()
+
+        list(
+            ElevenstAdapter(config(), http=http).fetch(
+                DateWindow(date(2026, 7, 31), date(2026, 8, 2))
+            )
+        )
+
+        self.assertEqual(
+            [call[1] for call in http.calls],
+            [f"{endpoint}/202607310000/202608022359" for endpoint in ORDER_ENDPOINTS],
+        )
+
+    def test_more_advanced_feed_replaces_duplicate_from_earlier_feed(self):
+        http = FakeHttpClient(
+            ("elevenst_duplicate_complete.xml", "elevenst_duplicate_delivered.xml")
+        )
+
+        records = list(ElevenstAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].identity, ("ELEVENST-ORDER-DUP", "ELEVENST-ITEM-DUP"))
+        self.assertEqual(records[0].columns["OrderStatus"], "DELIVERY_COMPLETE")
+        self.assertEqual(records[0].columns["DeliveryStatus"], "DELIVERED")
+        self.assertEqual(records[0].columns["TrackingNumber"], "SYNTHETIC-TRACKING-DELIVERED")
+
+    def test_successful_empty_namespaced_responses_return_zero_records(self):
+        self.assertEqual(list(ElevenstAdapter(config(), http=FakeHttpClient()).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

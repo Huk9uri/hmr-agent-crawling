@@ -1,0 +1,5 @@
+{
+  "warehouse": {"resultCode":"00","warehouseOuts":[{"ordNo":"SSG-ORDER-001","ordItemSeq":"2","shppNo":"SSG-SHIPPING-001","shppSeq":"3","whoutCmplDts":"2026-08-10 13:00:00","dvCoCd":"CJGLS","invcNo":"SSG-INVOICE-001"}]},
+  "nonDelivery": {"resultCode":"00","nonDeliveries":[{"ordNo":"SSG-ORDER-001","ordItemSeq":"2","shppNo":"SSG-SHIPPING-001","shppSeq":"3","shppProgStatDtlCd":"40","dvTrcStatDts":"2026-08-10 18:00:00"}]},
+  "deliveryEnd": {"resultCode":"00","deliveryEnds":[{"ordNo":"SSG-ORDER-001","ordItemSeq":"2","shppNo":"SSG-SHIPPING-001","shppSeq":"3","deliveryEndDts":"2026-08-11 09:00:00"}]}
+}

@@ -1,0 +1,40 @@
+{
+  "invalidRows": [
+    {
+      "component": "ordNo",
+      "row": {
+        "ordNo": null,
+        "ordItemSeq": 1,
+        "shppNo": "SSG-SHIPPING-001",
+        "shppSeq": "1"
+      }
+    },
+    {
+      "component": "ordItemSeq",
+      "row": {
+        "ordNo": "SSG-ORDER-001",
+        "ordItemSeq": "",
+        "shppNo": "SSG-SHIPPING-001",
+        "shppSeq": "1"
+      }
+    },
+    {
+      "component": "shppNo",
+      "row": {
+        "ordNo": "SSG-ORDER-001",
+        "ordItemSeq": 1,
+        "shppNo": null,
+        "shppSeq": "1"
+      }
+    },
+    {
+      "component": "shppSeq",
+      "row": {
+        "ordNo": "SSG-ORDER-001",
+        "ordItemSeq": 1,
+        "shppNo": "SSG-SHIPPING-001",
+        "shppSeq": ""
+      }
+    }
+  ]
+}

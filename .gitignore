@@ -2,3 +2,15 @@
 .env.*
 !.env.example
 .worktrees/
+raw-responses/
+raw_responses/
+*.raw-response.json
+*.http-response
+token-cache/
+token_cache/
+*.token-cache.json
+.uv-cache/
+collector-output/
+*.response-body
+__pycache__/
+*.py[cod]

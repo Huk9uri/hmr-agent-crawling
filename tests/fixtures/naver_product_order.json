@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-08-10T12:00:01.000+09:00",
+  "traceId": "SYNTHETIC_TRACE_NAVER_DETAIL",
+  "data": [
+    {
+      "order": {
+        "orderId": "NAVER-ORDER-001",
+        "orderDate": "2026-08-09T10:00:00.000+09:00",
+        "paymentDate": "2026-08-09T10:01:00.000+09:00",
+        "paymentMeans": "CARD",
+        "payLocationType": "PC",
+        "orderDiscountAmount": 1000,
+        "generalPaymentAmount": 23000,
+        "ordererId": "SYNTHETIC_ORDERER_ID_TO_MASK",
+        "ordererNo": "SYNTHETIC_ORDERER_NO_TO_MASK",
+        "ordererName": "SYNTHETIC_NAME_TO_MASK",
+        "ordererTel": "SYNTHETIC_PHONE_TO_MASK"
+      },
+      "productOrder": {
+        "productOrderId": "NAVER-PRODUCT-ORDER-001",
+        "productId": "NAVER-PRODUCT-001",
+        "itemNo": "NAVER-ITEM-001",
+        "optionManageCode": "SELLER-OPTION-CODE-001",
+        "productName": "Synthetic meal kit",
+        "productOption": "Two portions",
+        "quantity": 2,
+        "unitPrice": 12500,
+        "totalPaymentAmount": 24000,
+        "productOrderStatus": "DELIVERED",
+        "claimStatus": null,
+        "optionManageCode": "SELLER-OPTION-CODE-001",
+        "deliveryFeeAmount": 3000,
+        "sectionDeliveryFee": 3000,
+        "shippingDueDate": "2026-08-12T23:59:59.000+09:00",
+        "placeOrderDate": "2026-08-09T10:05:00.000+09:00",
+        "placeOrderStatus": "OK",
+        "expectedDeliveryMethod": "DELIVERY",
+        "deliveryAttributeType": "NORMAL",
+        "individualCustomUniqueCode": "SYNTHETIC_CUSTOMS_IDENTIFIER_TO_MASK",
+        "shippingAddress": {
+          "name": "SYNTHETIC_RECEIVER_TO_MASK",
+          "baseAddress": "SYNTHETIC_ADDRESS_TO_MASK",
+          "tel1": "SYNTHETIC_PHONE_TO_MASK"
+        }
+      },
+      "delivery": {
+        "deliveredDate": "2026-08-10T15:00:00.000+09:00",
+        "deliveryCompany": "CJGLS",
+        "deliveryMethod": "DELIVERY",
+        "deliveryStatus": "DELIVERY_COMPLETION",
+        "sendDate": "2026-08-09T18:00:00.000+09:00",
+        "trackingNumber": "SYNTHETIC-TRACKING-001"
+      }
+    }
+  ]
+}
