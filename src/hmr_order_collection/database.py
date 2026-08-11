@@ -49,7 +49,7 @@ TABLES: dict[str, TableDefinition] = {
     "lotteon": TableDefinition(
         "LOTTEON_ORDER_ITEM",
         ("OrderNo", "OrderItemSeq"),
-        ("OrderNo", "OrderItemSeq", "ProductId", "OptionId", "ProductName", "OptionName", "Quantity", "CanceledQuantity", "SalesAmount", "PaymentAmount", "OrderStatus", "DeliveryStatus", "OrderedAt", "PaidAt", "DispatchedAt", "DeliveryCompletedAt", "DeliveryCompanyCode", "TrackingNumber", "RawOrderStatus", "RawDeliveryStatus"),
+        ("OrderNo", "OrderItemSeq", "ProcessSequence", "ProductId", "OptionId", "ProductName", "OptionName", "Quantity", "CanceledQuantity", "SalesAmount", "PaymentAmount", "OrderStatus", "DeliveryStatus", "OrderedAt", "PaidAt", "DispatchedAt", "DeliveryCompletedAt", "DeliveryCompanyCode", "TrackingNumber", "RawOrderStatus", "RawDeliveryStatus"),
     ),
     "elevenst": TableDefinition(
         "ELEVENST_ORDER_ITEM",
@@ -59,7 +59,7 @@ TABLES: dict[str, TableDefinition] = {
     "ssg": TableDefinition(
         "SSG_ORDER_ITEM",
         ("OrdNo", "OrdItemSeq", "ShppNo", "ShppSeq"),
-        ("OrdNo", "OrdItemSeq", "ShppNo", "ShppSeq", "SiteNo", "ItemId", "UitemId", "SplVenItemId", "USplVenItemId", "ItemName", "UnitItemName", "OrderQuantity", "DirectedQuantity", "CanceledQuantity", "SupplyPrice", "SalesPrice", "RealOrderAmount", "DiscountAmount", "OrderStatusCode", "ShippingStatusCode", "ShippingProgressDetailCode", "OrderReceivedAt", "OrderCompletedAt", "ScheduledShippingDate", "RawOrderStatus", "RawDeliveryStatus"),
+        ("OrdNo", "OrdItemSeq", "ShppNo", "ShppSeq", "SiteNo", "ItemId", "UitemId", "SplVenItemId", "USplVenItemId", "ItemName", "UnitItemName", "OrderQuantity", "DirectedQuantity", "CanceledQuantity", "SupplyPrice", "SalesPrice", "RealOrderAmount", "DiscountAmount", "OrderStatusCode", "ShippingStatusCode", "ShippingProgressDetailCode", "OrderReceivedAt", "OrderCompletedAt", "ScheduledShippingDate", "WarehouseOutCompletedAt", "DeliveryCompanyCode", "TrackingNumber", "DeliveryTrackingStatusAt", "DeliveryCompletedAt", "RawOrderStatus", "RawDeliveryStatus"),
     ),
     "toss": TableDefinition(
         "TOSS_SHOPPING_ORDER_ITEM",

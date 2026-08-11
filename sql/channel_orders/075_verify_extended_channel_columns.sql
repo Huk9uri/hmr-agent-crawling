@@ -36,7 +36,19 @@ VALUES
 (N'GODOMALL_ORDER_ITEM', N'MemberDiscountAmount', N'decimal'),
 (N'GODOMALL_ORDER_ITEM', N'CouponOrderDiscountAmount', N'decimal'),
 (N'GODOMALL_ORDER_ITEM', N'UsedMileageAmount', N'decimal'),
-(N'GODOMALL_ORDER_ITEM', N'UsedDepositAmount', N'decimal');
+(N'GODOMALL_ORDER_ITEM', N'UsedDepositAmount', N'decimal'),
+(N'COUPANG_ORDER_ITEM', N'ProductId', N'nvarchar'),
+(N'COUPANG_ORDER_ITEM', N'VendorItemPackageId', N'nvarchar'),
+(N'COUPANG_ORDER_ITEM', N'VendorItemPackageName', N'nvarchar'),
+(N'COUPANG_ORDER_ITEM', N'VendorItemName', N'nvarchar'),
+(N'COUPANG_ORDER_ITEM', N'HeldCancellationQuantity', N'int'),
+(N'COUPANG_ORDER_ITEM', N'SalesPriceCurrencyCode', N'nvarchar'),
+(N'LOTTEON_ORDER_ITEM', N'ProcessSequence', N'nvarchar'),
+(N'SSG_ORDER_ITEM', N'WarehouseOutCompletedAt', N'datetime2'),
+(N'SSG_ORDER_ITEM', N'DeliveryCompanyCode', N'nvarchar'),
+(N'SSG_ORDER_ITEM', N'TrackingNumber', N'nvarchar'),
+(N'SSG_ORDER_ITEM', N'DeliveryTrackingStatusAt', N'datetime2'),
+(N'SSG_ORDER_ITEM', N'DeliveryCompletedAt', N'datetime2');
 
 DECLARE @Problems nvarchar(max);
 

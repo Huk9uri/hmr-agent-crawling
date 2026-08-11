@@ -76,6 +76,7 @@ class LotteonAdapterTests(unittest.TestCase):
         record = next(LotteonAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
         self.assertEqual(record.identity, ("LOTTE-ORDER-001", "3"))
+        self.assertEqual(record.columns["ProcessSequence"], "1")
         self.assertEqual(set(record.columns), set(TABLES["lotteon"].columns))
         self.assertEqual(record.columns["ProductId"], "LOTTE-PRODUCT-001")
         self.assertEqual(record.columns["DeliveryStatus"], "14")

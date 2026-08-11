@@ -8,7 +8,13 @@ import unittest
 import requests
 
 from hmr_order_collection.channels.base import DateWindow
-from hmr_order_collection.channels.ssg import SSG_ORDERS_URL, SsgAdapter
+from hmr_order_collection.channels.ssg import (
+    SSG_DELIVERY_END_URL,
+    SSG_NON_DELIVERY_URL,
+    SSG_ORDERS_URL,
+    SSG_WAREHOUSE_OUT_URL,
+    SsgAdapter,
+)
 from hmr_order_collection.config import AppConfig
 from hmr_order_collection.database import TABLES
 
@@ -38,11 +44,35 @@ class FakeHttpClient:
         return response(self.payload, url)
 
 
+class RoutingHttpClient:
+    def __init__(self, payloads):
+        self.payloads = payloads
+
+    def request(self, method, url, **kwargs):
+        return response(self.payloads[url], url)
+
+
 def config():
     return AppConfig(MappingProxyType({"SSG_API_KEY": "SYNTHETIC_SSG_API_KEY"}))
 
 
 class SsgAdapterTests(unittest.TestCase):
+    def test_fetch_joins_all_shipping_stage_responses(self):
+        stages = fixture("ssg_shipping_stages.json")
+        http = RoutingHttpClient({
+            SSG_ORDERS_URL: fixture("ssg_shipping_directions.json"),
+            SSG_WAREHOUSE_OUT_URL: stages["warehouse"],
+            SSG_NON_DELIVERY_URL: stages["nonDelivery"],
+            SSG_DELIVERY_END_URL: stages["deliveryEnd"],
+        })
+
+        record = next(SsgAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
+
+        self.assertEqual(record.columns["WarehouseOutCompletedAt"], "2026-08-10 13:00:00")
+        self.assertEqual(record.columns["DeliveryCompanyCode"], "CJGLS")
+        self.assertEqual(record.columns["TrackingNumber"], "SSG-INVOICE-001")
+        self.assertEqual(record.columns["DeliveryTrackingStatusAt"], "2026-08-10 18:00:00")
+        self.assertEqual(record.columns["DeliveryCompletedAt"], "2026-08-11 09:00:00")
     def test_fetch_treats_blank_string_shipping_direction_sentinel_as_empty(self):
         payload = {
             "resultCode": "00",
@@ -59,7 +89,7 @@ class SsgAdapterTests(unittest.TestCase):
             self.fail(f"blank SSG shipping-direction sentinel was rejected: {error}")
 
         self.assertEqual(records, [])
-        self.assertEqual(adapter.pages_fetched, 1)
+        self.assertEqual(adapter.pages_fetched, 4)
 
     def test_fetch_rejects_nonblank_string_shipping_direction_sentinel(self):
         payload = {
@@ -84,11 +114,11 @@ class SsgAdapterTests(unittest.TestCase):
                 DateWindow(date(2026, 2, 12), date(2026, 8, 10))
             )
         )
-        self.assertEqual(adapter.pages_fetched, 1)
+        self.assertEqual(adapter.pages_fetched, 4)
 
+        self.assertEqual(len(http.calls), 4)
         self.assertEqual(
-            http.calls,
-            [
+            http.calls[0],
                 (
                     "POST",
                     SSG_ORDERS_URL,
@@ -106,8 +136,7 @@ class SsgAdapterTests(unittest.TestCase):
                             }
                         },
                     },
-                )
-            ],
+                ),
         )
         self.assertEqual(record.identity, ("SSG-ORDER-001", "2", "SSG-SHIPPING-001", "3"))
         self.assertEqual(set(record.columns), set(TABLES["ssg"].columns))
@@ -138,6 +167,11 @@ class SsgAdapterTests(unittest.TestCase):
                 "OrderReceivedAt": "2026-08-09 10:00:00",
                 "OrderCompletedAt": "2026-08-09 10:01:00",
                 "ScheduledShippingDate": "2026-08-10",
+                "WarehouseOutCompletedAt": None,
+                "DeliveryCompanyCode": None,
+                "TrackingNumber": None,
+                "DeliveryTrackingStatusAt": None,
+                "DeliveryCompletedAt": None,
                 "RawOrderStatus": "120",
                 "RawDeliveryStatus": "11",
             },

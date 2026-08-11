@@ -14,6 +14,9 @@ from hmr_order_collection.models import ChannelRecord
 
 
 SSG_ORDERS_URL = "https://eapi.ssgadm.com/api/pd/1/listShppDirection.ssg"
+SSG_WAREHOUSE_OUT_URL = "https://eapi.ssgadm.com/api/pd/1/listWarehouseOut.ssg"
+SSG_NON_DELIVERY_URL = "https://eapi.ssgadm.com/api/pd/1/listNonDelivery.ssg"
+SSG_DELIVERY_END_URL = "https://eapi.ssgadm.com/api/pd/1/listDeliveryEnd.ssg"
 _PRIVATE_FIELDS = frozenset(
     {
         "mbrId",
@@ -48,14 +51,15 @@ class SsgAdapter(ChannelAdapter):
         if inclusive_days < 1 or inclusive_days > 180:
             raise ValueError("SSG order windows must contain between 1 and 180 days")
 
+        request_headers = {
+            "Accept": "application/json",
+            "Authorization": self._api_key,
+            "Content-Type": "application/json",
+        }
         response = self._http.request(
             "POST",
             SSG_ORDERS_URL,
-            headers={
-                "Accept": "application/json",
-                "Authorization": self._api_key,
-                "Content-Type": "application/json",
-            },
+            headers=request_headers,
             json={
                 "requestShppDirection": {
                     "perdType": "02",
@@ -64,15 +68,55 @@ class SsgAdapter(ChannelAdapter):
                 }
             },
         )
-        self._record_page()
-        payload = parse_json(response)
-        if not isinstance(payload, dict):
-            raise ValueError("SSG order response must be a JSON object")
-        result = payload.get("result") if isinstance(payload.get("result"), dict) else payload
-        if result.get("resultCode") != "00":
-            raise ValueError("SSG order response reported a business failure")
-        for row in _shipping_directions(result.get("shppDirections")):
+        directions = _result(self, response)
+        merged = {_identity(row): dict(row) for row in _shipping_directions(directions.get("shppDirections"))}
+        stages = (
+            (SSG_WAREHOUSE_OUT_URL, "requestWarehouseOut", "warehouseOuts"),
+            (SSG_NON_DELIVERY_URL, "requestNonDelivery", "nonDeliveries"),
+            (SSG_DELIVERY_END_URL, "requestDeliveryEnd", "deliveryEnds"),
+        )
+        for url, envelope, list_key in stages:
+            stage_response = self._http.request(
+                "POST", url, headers=dict(request_headers),
+                json={envelope: {"perdType": "02", "perdStrDts": window.start.isoformat(), "perdEndDts": window.end.isoformat()}},
+            )
+            result = _result(self, stage_response)
+            for stage_row in _stage_rows(result.get(list_key), list_key):
+                identity = _identity(stage_row)
+                if identity in merged:
+                    merged[identity].update(stage_row)
+        for row in merged.values():
             yield _map_record(row)
+
+
+def _result(adapter: SsgAdapter, response: Any) -> dict[str, Any]:
+    adapter._record_page()
+    payload = parse_json(response)
+    if not isinstance(payload, dict):
+        raise ValueError("SSG order response must be a JSON object")
+    result = payload.get("result") if isinstance(payload.get("result"), dict) else payload
+    if result.get("resultCode") != "00":
+        raise ValueError("SSG order response reported a business failure")
+    return result
+
+
+def _identity(row: dict[str, Any]) -> tuple[str, str, str, str]:
+    try:
+        values = (row["ordNo"], row["ordItemSeq"], row["shppNo"], row["shppSeq"])
+    except KeyError as error:
+        raise ValueError("SSG row lacked order/shipping identity") from error
+    if any(value is None or value == "" for value in values):
+        raise ValueError("SSG row lacked order/shipping identity")
+    return tuple(str(value) for value in values)
+
+
+def _stage_rows(value: Any, name: str) -> list[dict[str, Any]]:
+    if value is None or value == "":
+        return []
+    rows = value if isinstance(value, list) else [value]
+    if any(not isinstance(row, dict) for row in rows):
+        raise ValueError(f"SSG {name} list was malformed")
+    return rows
 
 
 def _shipping_directions(value: Any) -> list[dict[str, Any]]:
@@ -94,18 +138,7 @@ def _shipping_directions(value: Any) -> list[dict[str, Any]]:
 
 
 def _map_record(row: dict[str, Any]) -> ChannelRecord:
-    try:
-        raw_identity = (
-            row["ordNo"],
-            row["ordItemSeq"],
-            row["shppNo"],
-            row["shppSeq"],
-        )
-    except KeyError as error:
-        raise ValueError("SSG row lacked order/shipping identity") from error
-    if any(value is None or value == "" for value in raw_identity):
-        raise ValueError("SSG row lacked order/shipping identity")
-    identity = tuple(str(value) for value in raw_identity)
+    identity = _identity(row)
     order_status = _optional_str(row.get("ordStatCd"))
     shipping_status = _optional_str(row.get("shppStatCd"))
     shipping_progress = _optional_str(row.get("shppProgStatDtlCd"))
@@ -134,6 +167,11 @@ def _map_record(row: dict[str, Any]) -> ChannelRecord:
         "OrderReceivedAt": row.get("ordRcpDts"),
         "OrderCompletedAt": row.get("ordCmplDts"),
         "ScheduledShippingDate": row.get("shppRsvtDt"),
+        "WarehouseOutCompletedAt": row.get("whoutCmplDts"),
+        "DeliveryCompanyCode": _optional_str(row.get("dvCoCd")),
+        "TrackingNumber": _optional_str(row.get("invcNo")),
+        "DeliveryTrackingStatusAt": row.get("dvTrcStatDts"),
+        "DeliveryCompletedAt": row.get("deliveryEndDts"),
         "RawOrderStatus": order_status,
         "RawDeliveryStatus": shipping_progress or shipping_status,
     }

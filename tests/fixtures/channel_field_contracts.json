@@ -22,5 +22,12 @@
   {"channel":"godomall","response_path":"order.orderTypeFl","column":"OrderTypeCode","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"live"},
   {"channel":"godomall","response_path":"order.settleKind","column":"SettlementMethodCode","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"live"},
   {"channel":"godomall","response_path":"order.totalGoodsPrice","column":"TotalGoodsPrice","sql_type":"decimal(19,4)","nullable":true,"classification":"stored","evidence":"live"},
-  {"channel":"godomall","response_path":"orderItem.optionPrice","column":"OptionPrice","sql_type":"decimal(19,4)","nullable":true,"classification":"stored","evidence":"live"}
+  {"channel":"godomall","response_path":"orderItem.optionPrice","column":"OptionPrice","sql_type":"decimal(19,4)","nullable":true,"classification":"stored","evidence":"live"},
+  {"channel":"coupang","response_path":"orderItem.sellerProductItemId","column":"SellerProductItemId","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"coupang","response_path":"orderItem.holdCountForCancel","column":"HeldCancellationQuantity","sql_type":"int","nullable":true,"classification":"stored","evidence":"live"},
+  {"channel":"lotteon","response_path":"deliveryOrder.procSeq","column":"ProcessSequence","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"live"},
+  {"channel":"ssg","response_path":"warehouseOut.whoutCmplDts","column":"WarehouseOutCompletedAt","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"ssg","response_path":"warehouseOut.invcNo","column":"TrackingNumber","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"ssg","response_path":"nonDelivery.dvTrcStatDts","column":"DeliveryTrackingStatusAt","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"ssg","response_path":"deliveryEnd.deliveryEndDts","column":"DeliveryCompletedAt","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"}
 ]

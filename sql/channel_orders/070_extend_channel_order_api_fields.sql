@@ -37,3 +37,11 @@ IF COL_LENGTH(N'dbo.COUPANG_ORDER_ITEM', N'VendorItemPackageName') IS NULL ALTER
 IF COL_LENGTH(N'dbo.COUPANG_ORDER_ITEM', N'VendorItemName') IS NULL ALTER TABLE dbo.COUPANG_ORDER_ITEM ADD VendorItemName nvarchar(500) NULL;
 IF COL_LENGTH(N'dbo.COUPANG_ORDER_ITEM', N'HeldCancellationQuantity') IS NULL ALTER TABLE dbo.COUPANG_ORDER_ITEM ADD HeldCancellationQuantity int NULL;
 IF COL_LENGTH(N'dbo.COUPANG_ORDER_ITEM', N'SalesPriceCurrencyCode') IS NULL ALTER TABLE dbo.COUPANG_ORDER_ITEM ADD SalesPriceCurrencyCode nvarchar(100) NULL;
+
+IF COL_LENGTH(N'dbo.SSG_ORDER_ITEM', N'WarehouseOutCompletedAt') IS NULL ALTER TABLE dbo.SSG_ORDER_ITEM ADD WarehouseOutCompletedAt datetime2(3) NULL;
+IF COL_LENGTH(N'dbo.SSG_ORDER_ITEM', N'DeliveryCompanyCode') IS NULL ALTER TABLE dbo.SSG_ORDER_ITEM ADD DeliveryCompanyCode nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.SSG_ORDER_ITEM', N'TrackingNumber') IS NULL ALTER TABLE dbo.SSG_ORDER_ITEM ADD TrackingNumber nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.SSG_ORDER_ITEM', N'DeliveryTrackingStatusAt') IS NULL ALTER TABLE dbo.SSG_ORDER_ITEM ADD DeliveryTrackingStatusAt datetime2(3) NULL;
+IF COL_LENGTH(N'dbo.SSG_ORDER_ITEM', N'DeliveryCompletedAt') IS NULL ALTER TABLE dbo.SSG_ORDER_ITEM ADD DeliveryCompletedAt datetime2(3) NULL;
+
+IF COL_LENGTH(N'dbo.LOTTEON_ORDER_ITEM', N'ProcessSequence') IS NULL ALTER TABLE dbo.LOTTEON_ORDER_ITEM ADD ProcessSequence nvarchar(100) NULL;

@@ -131,6 +131,7 @@ def _map_record(order: dict[str, Any], progress: dict[str, Any] | None) -> Chann
     columns = {
         "OrderNo": order_no,
         "OrderItemSeq": order_item_seq,
+        "ProcessSequence": _optional_str(progress.get("procSeq") or order.get("procSeq")),
         "ProductId": _optional_str(order.get("spdNo") or order.get("pdNo")),
         "OptionId": _optional_str(order.get("sitmNo") or order.get("itmNo")),
         "ProductName": order.get("spdNm") or order.get("pdNm"),
