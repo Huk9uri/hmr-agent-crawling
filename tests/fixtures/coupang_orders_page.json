@@ -46,6 +46,7 @@
             "nanos": 250000000
           },
           "sellerProductId": "COUPANG-SELLER-PRODUCT-001",
+          "sellerProductItemId": "COUPANG-SELLER-ITEM-001",
           "sellerProductName": "Synthetic meal kit",
           "sellerProductItemName": "Two portions",
           "cancelCount": 1,

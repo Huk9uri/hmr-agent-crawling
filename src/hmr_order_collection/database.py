@@ -44,7 +44,7 @@ TABLES: dict[str, TableDefinition] = {
     "coupang": TableDefinition(
         "COUPANG_ORDER_ITEM",
         ("ShipmentBoxId", "OrderItemId"),
-        ("ShipmentBoxId", "OrderId", "OrderItemId", "VendorItemId", "SellerProductId", "SellerProductItemId", "ProductName", "OptionName", "Quantity", "CanceledQuantity", "SalesPrice", "OrderStatus", "DeliveryStatus", "OrderedAt", "PaidAt", "EstimatedShippingAt", "DispatchedAt", "DeliveryCompletedAt", "DeliveryCompanyCode", "TrackingNumber", "RawOrderStatus", "RawDeliveryStatus"),
+        ("ShipmentBoxId", "OrderId", "OrderItemId", "VendorItemId", "SellerProductId", "SellerProductItemId", "ProductId", "VendorItemPackageId", "VendorItemPackageName", "VendorItemName", "ProductName", "OptionName", "Quantity", "CanceledQuantity", "HeldCancellationQuantity", "SalesPrice", "SalesPriceCurrencyCode", "OrderStatus", "DeliveryStatus", "OrderedAt", "PaidAt", "EstimatedShippingAt", "DispatchedAt", "DeliveryCompletedAt", "DeliveryCompanyCode", "TrackingNumber", "RawOrderStatus", "RawDeliveryStatus"),
     ),
     "lotteon": TableDefinition(
         "LOTTEON_ORDER_ITEM",
