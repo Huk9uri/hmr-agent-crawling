@@ -34,7 +34,7 @@ TABLES: dict[str, TableDefinition] = {
     "naver": TableDefinition(
         "NAVER_SMARTSTORE_ORDER_ITEM",
         ("ProductOrderId",),
-        ("ProductOrderId", "OrderId", "ProductId", "OptionId", "ProductName", "OptionName", "Quantity", "UnitPrice", "TotalPaymentAmount", "ProductOrderStatus", "ClaimStatus", "DeliveryStatus", "PaymentAt", "DispatchAt", "DeliveryCompletedAt", "DeliveryCompanyCode", "TrackingNumber", "RawOrderStatus", "RawDeliveryStatus"),
+        ("ProductOrderId", "OrderId", "ProductId", "OptionId", "ProductName", "OptionName", "Quantity", "UnitPrice", "TotalPaymentAmount", "ProductOrderStatus", "ClaimStatus", "DeliveryStatus", "OrderDate", "PaymentAt", "DispatchAt", "DeliveryCompletedAt", "DeliveryCompanyCode", "TrackingNumber", "RawOrderStatus", "RawDeliveryStatus"),
     ),
     "godomall": TableDefinition(
         "GODOMALL_ORDER_ITEM",

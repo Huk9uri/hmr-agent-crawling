@@ -1,0 +1,9 @@
+[
+  {"channel":"naver","response_path":"order.orderDate","column":"OrderDate","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"godomall","response_path":"order.orderChannelFl","column":"OrderChannelCode","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"live"},
+  {"channel":"coupang","response_path":"shipment.orderId","column":"OrderId","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"lotteon","response_path":"deliveryOrder.odNo","column":"OrderNo","sql_type":"nvarchar(100)","nullable":false,"classification":"stored","evidence":"live"},
+  {"channel":"elevenst","response_path":"order.orderNo","column":"OrderNo","sql_type":"nvarchar(100)","nullable":false,"classification":"stored","evidence":"live"},
+  {"channel":"ssg","response_path":"shppDirection.ordNo","column":"OrdNo","sql_type":"nvarchar(100)","nullable":false,"classification":"stored","evidence":"live"},
+  {"channel":"toss","response_path":"orderProduct.orderProductId","column":"OrderProductId","sql_type":"bigint","nullable":false,"classification":"stored","evidence":"official"}
+]
