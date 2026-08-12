@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -174,7 +175,7 @@ def _map_record(row: dict[str, Any]) -> ChannelRecord:
         "ShippingProgressDetailCode": shipping_progress,
         "OrderReceivedAt": row.get("ordRcpDts"),
         "OrderCompletedAt": row.get("ordCmplDts"),
-        "ScheduledShippingDate": row.get("shppRsvtDt"),
+        "ScheduledShippingDate": _date_value(row.get("shppRsvtDt")),
         "WarehouseOutCompletedAt": row.get("whoutDt"),
         "DeliveryCompanyCode": _optional_str(row.get("delicoVenId")),
         "TrackingNumber": _optional_str(row.get("wblNo")),
@@ -218,3 +219,15 @@ def _decimal(value: Any) -> Decimal | None:
         return Decimal(str(value))
     except (InvalidOperation, ValueError) as error:
         raise ValueError("SSG numeric field was invalid") from error
+
+
+def _date_value(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    raw = str(value)
+    if len(raw) == 8 and raw.isdigit():
+        raw = f"{raw[:4]}-{raw[4:6]}-{raw[6:]}"
+    try:
+        return date.fromisoformat(raw).isoformat()
+    except ValueError as error:
+        raise ValueError("SSG date field was invalid") from error

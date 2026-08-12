@@ -136,6 +136,17 @@ class SsgAdapterTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].identity, ("SSG-ORDER-001", "2", "SSG-SHIPPING-001", "3"))
 
+    def test_fetch_normalizes_numeric_scheduled_shipping_date_for_sql_date(self):
+        payload = fixture("ssg_shipping_directions.json")
+        payload["shppDirections"][0]["shppDirection"]["shppRsvtDt"] = 20260810
+        adapter = SsgAdapter(config(), http=FakeHttpClient(payload))
+
+        record = next(
+            adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))
+        )
+
+        self.assertEqual(record.columns["ScheduledShippingDate"], "2026-08-10")
+
     def test_fetch_treats_blank_string_shipping_direction_sentinel_as_empty(self):
         payload = {
             "resultCode": "00",
