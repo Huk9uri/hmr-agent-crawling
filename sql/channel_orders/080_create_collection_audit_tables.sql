@@ -1,0 +1,43 @@
+SET XACT_ABORT ON;
+
+IF OBJECT_ID(N'dbo.CHANNEL_COLLECTION_RUN', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CHANNEL_COLLECTION_RUN (
+        RunId uniqueidentifier NOT NULL CONSTRAINT PK_CHANNEL_COLLECTION_RUN PRIMARY KEY,
+        ScheduledDate date NOT NULL,
+        StartedAt datetime2(3) NOT NULL,
+        FinishedAt datetime2(3) NULL,
+        RunStatus nvarchar(30) NOT NULL,
+        SuccessfulChannels int NOT NULL CONSTRAINT DF_CHANNEL_COLLECTION_RUN_SUCCESS DEFAULT (0),
+        FailedChannels int NOT NULL CONSTRAINT DF_CHANNEL_COLLECTION_RUN_FAILED DEFAULT (0),
+        CreatedAt datetime2(3) NOT NULL CONSTRAINT DF_CHANNEL_COLLECTION_RUN_CREATED DEFAULT (SYSUTCDATETIME())
+    );
+END;
+
+IF OBJECT_ID(N'dbo.CHANNEL_COLLECTION_ATTEMPT', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CHANNEL_COLLECTION_ATTEMPT (
+        AttemptId bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_CHANNEL_COLLECTION_ATTEMPT PRIMARY KEY,
+        RunId uniqueidentifier NOT NULL,
+        ChannelName nvarchar(30) NOT NULL,
+        AttemptNo int NOT NULL,
+        StartedAt datetime2(3) NOT NULL,
+        FinishedAt datetime2(3) NOT NULL,
+        AttemptStatus nvarchar(30) NOT NULL,
+        WindowsCount int NOT NULL,
+        PagesCount int NOT NULL,
+        RecordsCount int NOT NULL,
+        InsertedCount int NOT NULL,
+        ChangedCount int NOT NULL,
+        SkippedCount int NOT NULL,
+        ErrorCategory nvarchar(50) NULL,
+        CONSTRAINT FK_CHANNEL_COLLECTION_ATTEMPT_RUN FOREIGN KEY (RunId) REFERENCES dbo.CHANNEL_COLLECTION_RUN(RunId),
+        CONSTRAINT UQ_CHANNEL_COLLECTION_ATTEMPT UNIQUE (RunId, ChannelName, AttemptNo)
+    );
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.CHANNEL_COLLECTION_RUN') AND name = N'IX_CHANNEL_COLLECTION_RUN_SCHEDULED_STATUS')
+    CREATE INDEX IX_CHANNEL_COLLECTION_RUN_SCHEDULED_STATUS ON dbo.CHANNEL_COLLECTION_RUN(ScheduledDate, RunStatus);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.CHANNEL_COLLECTION_ATTEMPT') AND name = N'IX_CHANNEL_COLLECTION_ATTEMPT_CHANNEL_STATUS')
+    CREATE INDEX IX_CHANNEL_COLLECTION_ATTEMPT_CHANNEL_STATUS ON dbo.CHANNEL_COLLECTION_ATTEMPT(ChannelName, AttemptStatus, FinishedAt);
