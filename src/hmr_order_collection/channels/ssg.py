@@ -14,7 +14,6 @@ from hmr_order_collection.models import ChannelRecord
 
 
 SSG_ORDERS_URL = "https://eapi.ssgadm.com/api/pd/1/listShppDirection.ssg"
-SSG_WAREHOUSE_OUT_URL = "https://eapi.ssgadm.com/api/pd/1/listWarehouseOut.ssg"
 SSG_NON_DELIVERY_URL = "https://eapi.ssgadm.com/api/pd/1/listNonDelivery.ssg"
 SSG_DELIVERY_END_URL = "https://eapi.ssgadm.com/api/pd/1/listDeliveryEnd.ssg"
 _PRIVATE_FIELDS = frozenset(
@@ -71,20 +70,26 @@ class SsgAdapter(ChannelAdapter):
         directions = _result(self, response)
         merged = {_identity(row): dict(row) for row in _shipping_directions(directions.get("shppDirections"))}
         stages = (
-            (SSG_WAREHOUSE_OUT_URL, "requestWarehouseOut", "warehouseOuts"),
-            (SSG_NON_DELIVERY_URL, "requestNonDelivery", "nonDeliveries"),
+            (SSG_NON_DELIVERY_URL, "requestNonDelivery", "nonDeliverys"),
             (SSG_DELIVERY_END_URL, "requestDeliveryEnd", "deliveryEnds"),
         )
-        for url, envelope, list_key in stages:
-            stage_response = self._http.request(
-                "POST", url, headers=dict(request_headers),
-                json={envelope: {"perdType": "02", "perdStrDts": window.start.isoformat(), "perdEndDts": window.end.isoformat()}},
-            )
-            result = _result(self, stage_response)
-            for stage_row in _stage_rows(result.get(list_key), list_key):
-                identity = _identity(stage_row)
-                if identity in merged:
-                    merged[identity].update(stage_row)
+        shipping_numbers = dict.fromkeys(identity[2] for identity in merged)
+        for shipping_number in shipping_numbers:
+            for url, envelope, list_key in stages:
+                stage_response = self._http.request(
+                    "POST", url, headers=dict(request_headers),
+                    json={
+                        envelope: {
+                            "commType": "02",
+                            "commValue": shipping_number,
+                        }
+                    },
+                )
+                result = _result(self, stage_response)
+                for stage_row in _stage_rows(result.get(list_key), list_key):
+                    identity = _identity(stage_row)
+                    if identity in merged:
+                        merged[identity].update(stage_row)
         for row in merged.values():
             yield _map_record(row)
 
@@ -142,7 +147,9 @@ def _map_record(row: dict[str, Any]) -> ChannelRecord:
     identity = _identity(row)
     order_status = _optional_str(row.get("ordStatCd"))
     shipping_status = _optional_str(row.get("shppStatCd"))
-    shipping_progress = _optional_str(row.get("shppProgStatDtlCd"))
+    shipping_progress = _optional_str(
+        row.get("lastShppProgStatDtlCd") or row.get("shppProgStatDtlCd")
+    )
     columns = {
         "OrdNo": identity[0],
         "OrdItemSeq": identity[1],
@@ -168,11 +175,11 @@ def _map_record(row: dict[str, Any]) -> ChannelRecord:
         "OrderReceivedAt": row.get("ordRcpDts"),
         "OrderCompletedAt": row.get("ordCmplDts"),
         "ScheduledShippingDate": row.get("shppRsvtDt"),
-        "WarehouseOutCompletedAt": row.get("whoutCmplDts"),
-        "DeliveryCompanyCode": _optional_str(row.get("dvCoCd")),
-        "TrackingNumber": _optional_str(row.get("invcNo")),
-        "DeliveryTrackingStatusAt": row.get("dvTrcStatDts"),
-        "DeliveryCompletedAt": row.get("deliveryEndDts"),
+        "WarehouseOutCompletedAt": row.get("whoutDt"),
+        "DeliveryCompanyCode": _optional_str(row.get("delicoVenId")),
+        "TrackingNumber": _optional_str(row.get("wblNo")),
+        "DeliveryTrackingStatusAt": None,
+        "DeliveryCompletedAt": row.get("shppDt"),
         "RawOrderStatus": order_status,
         "RawDeliveryStatus": shipping_progress or shipping_status,
     }

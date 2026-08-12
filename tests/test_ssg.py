@@ -12,7 +12,6 @@ from hmr_order_collection.channels.ssg import (
     SSG_DELIVERY_END_URL,
     SSG_NON_DELIVERY_URL,
     SSG_ORDERS_URL,
-    SSG_WAREHOUSE_OUT_URL,
     SsgAdapter,
 )
 from hmr_order_collection.config import AppConfig
@@ -47,8 +46,10 @@ class FakeHttpClient:
 class RoutingHttpClient:
     def __init__(self, payloads):
         self.payloads = payloads
+        self.calls = []
 
     def request(self, method, url, **kwargs):
+        self.calls.append((method, url, kwargs))
         return response(self.payloads[url], url)
 
 
@@ -57,13 +58,38 @@ def config():
 
 
 class SsgAdapterTests(unittest.TestCase):
-    def test_fetch_joins_all_shipping_stage_responses(self):
-        stages = fixture("ssg_shipping_stages.json")
+    def test_fetch_enriches_official_fields_by_shipping_number(self):
         http = RoutingHttpClient({
             SSG_ORDERS_URL: fixture("ssg_shipping_directions.json"),
-            SSG_WAREHOUSE_OUT_URL: stages["warehouse"],
-            SSG_NON_DELIVERY_URL: stages["nonDelivery"],
-            SSG_DELIVERY_END_URL: stages["deliveryEnd"],
+            SSG_NON_DELIVERY_URL: {
+                "resultCode": "00",
+                "resultMessage": "SUCCESS",
+                "nonDeliverys": [{
+                    "ordNo": "SSG-ORDER-001",
+                    "ordItemSeq": 2,
+                    "shppNo": "SSG-SHIPPING-001",
+                    "shppSeq": 3,
+                    "whoutDt": "2026-08-10 13:00:00",
+                    "delicoVenId": "CJGLS",
+                    "wblNo": "SSG-INVOICE-001",
+                    "lastShppProgStatDtlCd": "43",
+                }],
+            },
+            SSG_DELIVERY_END_URL: {
+                "resultCode": "00",
+                "resultMessage": "SUCCESS",
+                "deliveryEnds": [{
+                    "ordNo": "SSG-ORDER-001",
+                    "ordItemSeq": 2,
+                    "shppNo": "SSG-SHIPPING-001",
+                    "shppSeq": 3,
+                    "whoutDt": "2026-08-10 13:00:00",
+                    "delicoVenId": "CJGLS",
+                    "wblNo": "SSG-INVOICE-001",
+                    "shppDt": "2026-08-11 09:00:00",
+                    "lastShppProgStatDtlCd": "51",
+                }],
+            },
         })
 
         record = next(SsgAdapter(config(), http=http).fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
@@ -71,20 +97,34 @@ class SsgAdapterTests(unittest.TestCase):
         self.assertEqual(record.columns["WarehouseOutCompletedAt"], "2026-08-10 13:00:00")
         self.assertEqual(record.columns["DeliveryCompanyCode"], "CJGLS")
         self.assertEqual(record.columns["TrackingNumber"], "SSG-INVOICE-001")
-        self.assertEqual(record.columns["DeliveryTrackingStatusAt"], "2026-08-10 18:00:00")
+        self.assertIsNone(record.columns["DeliveryTrackingStatusAt"])
         self.assertEqual(record.columns["DeliveryCompletedAt"], "2026-08-11 09:00:00")
+        self.assertEqual(record.columns["ShippingProgressDetailCode"], "51")
+        self.assertEqual(record.columns["RawDeliveryStatus"], "51")
+        self.assertEqual(
+            [call[1] for call in http.calls],
+            [SSG_ORDERS_URL, SSG_NON_DELIVERY_URL, SSG_DELIVERY_END_URL],
+        )
+        for _, _, kwargs in http.calls[1:]:
+            envelope = next(iter(kwargs["json"].values()))
+            self.assertEqual(
+                envelope,
+                {"commType": "02", "commValue": "SSG-SHIPPING-001"},
+            )
 
     def test_fetch_treats_blank_follow_up_stage_sentinel_as_empty(self):
-        stages = fixture("ssg_shipping_stages.json")
         http = RoutingHttpClient({
             SSG_ORDERS_URL: fixture("ssg_shipping_directions.json"),
-            SSG_WAREHOUSE_OUT_URL: {
+            SSG_NON_DELIVERY_URL: {
                 "resultCode": "00",
                 "resultMessage": "SUCCESS",
-                "warehouseOuts": [""],
+                "nonDeliverys": [""],
             },
-            SSG_NON_DELIVERY_URL: stages["nonDelivery"],
-            SSG_DELIVERY_END_URL: stages["deliveryEnd"],
+            SSG_DELIVERY_END_URL: {
+                "resultCode": "00",
+                "resultMessage": "SUCCESS",
+                "deliveryEnds": [""],
+            },
         })
 
         records = list(
@@ -112,7 +152,7 @@ class SsgAdapterTests(unittest.TestCase):
             self.fail(f"blank SSG shipping-direction sentinel was rejected: {error}")
 
         self.assertEqual(records, [])
-        self.assertEqual(adapter.pages_fetched, 4)
+        self.assertEqual(adapter.pages_fetched, 1)
 
     def test_fetch_rejects_nonblank_string_shipping_direction_sentinel(self):
         payload = {
@@ -137,9 +177,9 @@ class SsgAdapterTests(unittest.TestCase):
                 DateWindow(date(2026, 2, 12), date(2026, 8, 10))
             )
         )
-        self.assertEqual(adapter.pages_fetched, 4)
+        self.assertEqual(adapter.pages_fetched, 3)
 
-        self.assertEqual(len(http.calls), 4)
+        self.assertEqual(len(http.calls), 3)
         self.assertEqual(
             http.calls[0],
                 (
