@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Preserve valid SSG shipping-direction orders when a follow-up stage returns its empty result as a blank-string list element, then load the recovered order into SQL Server.
+**Goal:** Preserve valid SSG shipping-direction orders, enrich them through shipping-number quick searches using official field names, then load the recovered order into SQL Server.
 
-**Architecture:** Keep the existing four-API orchestration and normalize only blank strings at the `_stage_rows` response boundary. Malformed nonblank values continue to fail closed. Database persistence remains unchanged.
+**Architecture:** Use the shipping-direction feed for base rows, then query non-delivery and delivery-completed feeds once per unique shipping number. Normalize blank sentinels, merge official enrichment fields by the deployed four-part identity, and keep database persistence unchanged.
 
 **Tech Stack:** Python 3.12, `unittest`, `requests`, SQL Server via `pymssql`.
 
@@ -13,6 +13,8 @@
 - Do not print API credentials, response bodies, personal data, or raw order payloads.
 - Do not change schemas or adapters for other channels.
 - Treat only whitespace-only strings as empty sentinels; continue rejecting nonblank strings.
+- Do not call `listWarehouseOut`; it is an outbound-processing target list rather than a completion feed.
+- Leave `DeliveryTrackingStatusAt` null because no approved response field supports it.
 - Use the inclusive 180-day SSG window ending 2026-08-12 for the operational reload.
 
 ---
@@ -58,7 +60,46 @@ git add -- tests/test_ssg.py src/hmr_order_collection/channels/ssg.py
 git commit -m "fix: accept empty SSG follow-up stage sentinel"
 ```
 
-### Task 2: Reload and verify SSG
+### Task 2: Enrich by shipping-number quick search
+
+**Files:**
+- Modify: `tests/test_ssg.py`
+- Modify: `src/hmr_order_collection/channels/ssg.py`
+
+**Interfaces:**
+- Consumes: base records keyed by `(ordNo, ordItemSeq, shppNo, shppSeq)` and quick-search responses from `listNonDelivery` and `listDeliveryEnd`.
+- Produces: merged records using official `whoutDt`, `delicoVenId`, `wblNo`, `shppDt`, and `lastShppProgStatDtlCd` fields.
+
+- [ ] **Step 1: Write failing quick-search and mapping tests**
+
+Use synthetic official response shapes to assert that each unique `shppNo` is sent as `{"commType": "02", "commValue": shpp_no}` to both enrichment endpoints, `listWarehouseOut` is not called, and the official response fields populate the deployed columns.
+
+- [ ] **Step 2: Verify the new tests fail**
+
+Run the named SSG quick-search and mapping tests with `python -m unittest ... -v`.
+
+Expected: failures show the existing period request, obsolete endpoint call, and missing official-field mappings.
+
+- [ ] **Step 3: Implement quick-search enrichment**
+
+Collect base rows, issue two quick searches per unique shipping number, accept the official `nonDeliverys` and `deliveryEnds` keys, merge matching identities, and map the approved fields. Preserve failure behavior for nonblank malformed values and non-success result codes.
+
+- [ ] **Step 4: Run focused and full tests**
+
+Run: `python -m unittest tests.test_ssg -v`
+
+Run: `python -m unittest discover -s tests -v`
+
+Expected: all tests pass with no warnings, errors, or failures.
+
+- [ ] **Step 5: Commit the enrichment correction**
+
+```bash
+git add -- tests/test_ssg.py src/hmr_order_collection/channels/ssg.py
+git commit -m "fix: enrich SSG orders by shipping number"
+```
+
+### Task 3: Reload and verify SSG
 
 **Files:**
 - No source files modified.
