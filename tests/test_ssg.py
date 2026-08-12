@@ -73,6 +73,29 @@ class SsgAdapterTests(unittest.TestCase):
         self.assertEqual(record.columns["TrackingNumber"], "SSG-INVOICE-001")
         self.assertEqual(record.columns["DeliveryTrackingStatusAt"], "2026-08-10 18:00:00")
         self.assertEqual(record.columns["DeliveryCompletedAt"], "2026-08-11 09:00:00")
+
+    def test_fetch_treats_blank_follow_up_stage_sentinel_as_empty(self):
+        stages = fixture("ssg_shipping_stages.json")
+        http = RoutingHttpClient({
+            SSG_ORDERS_URL: fixture("ssg_shipping_directions.json"),
+            SSG_WAREHOUSE_OUT_URL: {
+                "resultCode": "00",
+                "resultMessage": "SUCCESS",
+                "warehouseOuts": [""],
+            },
+            SSG_NON_DELIVERY_URL: stages["nonDelivery"],
+            SSG_DELIVERY_END_URL: stages["deliveryEnd"],
+        })
+
+        records = list(
+            SsgAdapter(config(), http=http).fetch(
+                DateWindow(date(2026, 8, 10), date(2026, 8, 10))
+            )
+        )
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].identity, ("SSG-ORDER-001", "2", "SSG-SHIPPING-001", "3"))
+
     def test_fetch_treats_blank_string_shipping_direction_sentinel_as_empty(self):
         payload = {
             "resultCode": "00",

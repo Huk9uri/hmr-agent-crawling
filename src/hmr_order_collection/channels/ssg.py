@@ -114,6 +114,7 @@ def _stage_rows(value: Any, name: str) -> list[dict[str, Any]]:
     if value is None or value == "":
         return []
     rows = value if isinstance(value, list) else [value]
+    rows = [row for row in rows if not (isinstance(row, str) and not row.strip())]
     if any(not isinstance(row, dict) for row in rows):
         raise ValueError(f"SSG {name} list was malformed")
     return rows
