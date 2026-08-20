@@ -29,5 +29,7 @@
   {"channel":"ssg","response_path":"warehouseOut.whoutCmplDts","column":"WarehouseOutCompletedAt","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"},
   {"channel":"ssg","response_path":"warehouseOut.invcNo","column":"TrackingNumber","sql_type":"nvarchar(100)","nullable":true,"classification":"stored","evidence":"official"},
   {"channel":"ssg","response_path":"nonDelivery.dvTrcStatDts","column":"DeliveryTrackingStatusAt","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"},
-  {"channel":"ssg","response_path":"deliveryEnd.deliveryEndDts","column":"DeliveryCompletedAt","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"}
+  {"channel":"ssg","response_path":"deliveryEnd.deliveryEndDts","column":"DeliveryCompletedAt","sql_type":"datetime2(3)","nullable":true,"classification":"stored","evidence":"official"},
+  {"channel":"cj_onstyle","response_path":"data[].orderNo","column":"OrderNo","sql_type":"nvarchar(100)","nullable":false,"classification":"stored","evidence":"live"},
+  {"channel":"cj_onstyle","response_path":"data[].recipientName","column":"","sql_type":"nvarchar(500)","nullable":true,"classification":"masked","evidence":"official"}
 ]

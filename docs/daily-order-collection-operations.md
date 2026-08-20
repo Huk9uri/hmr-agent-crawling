@@ -2,9 +2,9 @@
 
 ## What is automated
 
-The orchestrator runs the seven deployed channels independently: Naver SmartStore, Godomall, Coupang, LotteON, 11st, SSG.COM, and Toss Shopping. It uses each channel's verified maximum safe window, retries failures twice at ten-minute intervals, records every attempt in SQL Server, and returns nonzero when any channel remains failed.
+The orchestrator runs the eight deployed channels independently: Naver SmartStore, Godomall, Coupang, LotteON, 11st, SSG.COM, CJ OnStyle, and Toss Shopping. It uses each channel's verified maximum safe window, retries failures twice at ten-minute intervals, records every attempt in SQL Server, and returns nonzero when any channel remains failed.
 
-CJ OnStyle and other channels without production-ready collectors are not included. Email notification and the separate missing-run watchdog will be added after a corporate SMTP account is issued.
+Email notification and the separate missing-run watchdog will be added after a corporate SMTP account is issued.
 
 ## Server prerequisites
 

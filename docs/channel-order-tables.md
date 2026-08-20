@@ -15,6 +15,7 @@
 5. `dbo.ELEVENST_ORDER_ITEM`
 6. `dbo.SSG_ORDER_ITEM`
 7. `dbo.TOSS_SHOPPING_ORDER_ITEM`
+8. `dbo.CJ_ONSTYLE_ORDER_ITEM`
 
 각 행은 주문상품 한 건의 한 시점 상태다. 동일 주문상품의 상태가 바뀌면 기존 행을 수정하지 않고 새 행을 추가한다. 최신 행은 `IsLatest = 1`이며 필터형 UNIQUE 인덱스가 주문상품별 최신 행을 하나로 제한한다.
 
@@ -28,6 +29,7 @@ sql/channel_orders/010_create_naver_godomall_tables.sql
 sql/channel_orders/020_create_coupang_lotteon_tables.sql
 sql/channel_orders/030_create_elevenst_ssg_tables.sql
 sql/channel_orders/040_create_toss_shopping_table.sql
+sql/channel_orders/045_create_cj_onstyle_table.sql
 sql/channel_orders/050_create_channel_order_indexes.sql
 sql/channel_orders/005_verify_object_contract.sql
 sql/channel_orders/060_verify_history_constraints.sql

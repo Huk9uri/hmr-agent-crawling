@@ -61,6 +61,11 @@ TABLES: dict[str, TableDefinition] = {
         ("OrdNo", "OrdItemSeq", "ShppNo", "ShppSeq"),
         ("OrdNo", "OrdItemSeq", "ShppNo", "ShppSeq", "SiteNo", "ItemId", "UitemId", "SplVenItemId", "USplVenItemId", "ItemName", "UnitItemName", "OrderQuantity", "DirectedQuantity", "CanceledQuantity", "SupplyPrice", "SalesPrice", "RealOrderAmount", "DiscountAmount", "OrderStatusCode", "ShippingStatusCode", "ShippingProgressDetailCode", "OrderReceivedAt", "OrderCompletedAt", "ScheduledShippingDate", "WarehouseOutCompletedAt", "DeliveryCompanyCode", "TrackingNumber", "DeliveryTrackingStatusAt", "DeliveryCompletedAt", "RawOrderStatus", "RawDeliveryStatus"),
     ),
+    "cj_onstyle": TableDefinition(
+        "CJ_ONSTYLE_ORDER_ITEM",
+        ("OrderNo", "OrderItemSequence", "OrderDetailSequence", "OrderProcessingSequence"),
+        ("OrderNo", "OrderItemSequence", "OrderDetailSequence", "OrderProcessingSequence", "OriginalOrderNo", "ItemCode", "OptionCode", "VendorItemCode", "ItemName", "OptionName", "WebItemName", "PackItemName", "PackItemAvailability", "ItemType", "ItemCategory", "Quantity", "SupplyPrice", "SalesPrice", "PaymentPrice", "CustomerResponsibilityCost", "DeliveryStatus", "DeliveryInstructionCheck", "DeliveryMethodName", "DeliveryType", "OrderType", "ScheduledCancellation", "DeliveryInstructionAt", "ExpectedDeliveryDate", "DispatchedAt", "DeliveryCompletedAt", "DeliveryCanceledAt", "PaidAt", "DeliveryCompanyCode", "TrackingNumber", "WaybillIdentifierNo", "ReasonForNonDelivery", "ClaimReason", "SalesChannel", "SalesChannelName", "EarlyMorningDelivery", "AlreadyDeliveryStatus", "ForcedDeliveryStatus", "CustomerDesignationStatus", "InternationalShippingAvailability", "AffiliateItemName", "AffiliateItemCode", "BrandCode", "BrandName", "FulfillmentName", "RawOrderStatus", "RawDeliveryStatus"),
+    ),
     "toss": TableDefinition(
         "TOSS_SHOPPING_ORDER_ITEM",
         ("OrderProductId",),

@@ -26,6 +26,7 @@ VALUES
     (N'LOTTEON_ORDER_ITEM', N'CK_LOTTEON_ORDER_ITEM_RawJson'),
     (N'ELEVENST_ORDER_ITEM', N'CK_ELEVENST_ORDER_ITEM_RawJson'),
     (N'SSG_ORDER_ITEM', N'CK_SSG_ORDER_ITEM_RawJson'),
+    (N'CJ_ONSTYLE_ORDER_ITEM', N'CK_CJ_ONSTYLE_ORDER_ITEM_RawJson'),
     (N'TOSS_SHOPPING_ORDER_ITEM', N'CK_TOSS_SHOPPING_ORDER_ITEM_RawJson');
 
 DECLARE @InvalidRawJsonConstraints nvarchar(max);
@@ -131,6 +132,18 @@ VALUES
     N'DELIVERED', N'DELIVERED', @VerificationJson, @VerificationHash, 1
 );
 
+INSERT dbo.CJ_ONSTYLE_ORDER_ITEM
+(
+    CollectionRunId, CollectedAt, OrderNo, OrderItemSequence,
+    OrderDetailSequence, OrderProcessingSequence,
+    RawJson, PayloadHash, IsLatest
+)
+VALUES
+(
+    NEWID(), SYSUTCDATETIME(), N'TEST-CJ-ORDER', N'1', N'1', N'1',
+    @VerificationJson, @VerificationHash, 1
+);
+
 DECLARE @InsertedRows int;
 DECLARE @DistinctCollectionRuns int;
 
@@ -151,10 +164,12 @@ FROM
     UNION ALL
     SELECT CollectionRunId FROM dbo.SSG_ORDER_ITEM WHERE RawJson = @VerificationJson
     UNION ALL
+    SELECT CollectionRunId FROM dbo.CJ_ONSTYLE_ORDER_ITEM WHERE RawJson = @VerificationJson
+    UNION ALL
     SELECT CollectionRunId FROM dbo.TOSS_SHOPPING_ORDER_ITEM WHERE RawJson = @VerificationJson
 ) AS VerificationRows;
 
-IF @InsertedRows <> 7 OR @DistinctCollectionRuns <> 7
+IF @InsertedRows <> 8 OR @DistinctCollectionRuns <> 8
     THROW 51005, N'Channel order sample insertion verification failed.', 1;
 
 ROLLBACK TRANSACTION;
@@ -175,6 +190,8 @@ FROM
     SELECT StagingId FROM dbo.ELEVENST_ORDER_ITEM WHERE RawJson = @VerificationJson
     UNION ALL
     SELECT StagingId FROM dbo.SSG_ORDER_ITEM WHERE RawJson = @VerificationJson
+    UNION ALL
+    SELECT StagingId FROM dbo.CJ_ONSTYLE_ORDER_ITEM WHERE RawJson = @VerificationJson
     UNION ALL
     SELECT StagingId FROM dbo.TOSS_SHOPPING_ORDER_ITEM WHERE RawJson = @VerificationJson
 ) AS RolledBackRows;

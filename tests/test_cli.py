@@ -123,7 +123,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(
             output["channels"],
-            ["naver", "coupang", "godomall", "lotteon", "elevenst", "ssg", "toss"],
+            ["naver", "coupang", "godomall", "lotteon", "elevenst", "ssg", "cj_onstyle", "toss"],
         )
         self.assertEqual(error, "")
         self.assertEqual(calls, {"config": 0, "registry": 0, "connection": 0})
@@ -308,6 +308,7 @@ class CliTests(unittest.TestCase):
             "lotteon": date(2026, 8, 10),
             "elevenst": date(2026, 8, 10),
             "ssg": date(2026, 2, 12),
+            "cj_onstyle": date(2026, 7, 11),
             "toss": date(2026, 7, 11),
         }
         for channel, adapter in adapters.items():
@@ -572,7 +573,7 @@ class CliTests(unittest.TestCase):
 
 
 class AdapterRegistryTests(unittest.TestCase):
-    def test_registry_instantiates_all_seven_adapters_from_strict_config(self):
+    def test_registry_instantiates_all_eight_adapters_from_strict_config(self):
         from hmr_order_collection.channels import build_adapter_registry
         from hmr_order_collection.channels.coupang import CoupangAdapter
         from hmr_order_collection.channels.elevenst import ElevenstAdapter
@@ -580,6 +581,7 @@ class AdapterRegistryTests(unittest.TestCase):
         from hmr_order_collection.channels.lotteon import LotteonAdapter
         from hmr_order_collection.channels.naver import NaverAdapter
         from hmr_order_collection.channels.ssg import SsgAdapter
+        from hmr_order_collection.channels.cj_onstyle import CjOnstyleAdapter
         from hmr_order_collection.channels.toss import TossShoppingAdapter
 
         values = {
@@ -593,6 +595,8 @@ class AdapterRegistryTests(unittest.TestCase):
             "LOTTEON_API_KEY": "synthetic",
             "ELEVENST_API_KEY": "synthetic",
             "SSG_API_KEY": "synthetic",
+            "CJ_ONSTYLE_VENDOR_CODE": "synthetic",
+            "CJ_ONSTYLE_AUTHENTICATION_KEY": "synthetic",
             "TOSS_SHOPPING_ACCESS_KEY": "synthetic",
             "TOSS_SHOPPING_SECRET_KEY": "synthetic",
         }
@@ -607,6 +611,7 @@ class AdapterRegistryTests(unittest.TestCase):
                 "lotteon": LotteonAdapter,
                 "elevenst": ElevenstAdapter,
                 "ssg": SsgAdapter,
+                "cj_onstyle": CjOnstyleAdapter,
                 "toss": TossShoppingAdapter,
             },
         )

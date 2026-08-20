@@ -52,6 +52,11 @@ VALUES
     (N'IX_SSG_ORDER_ITEM_Identity_PayloadHash', N'SSG_ORDER_ITEM', 0, N'OrdNo, OrdItemSeq, ShppNo, ShppSeq, PayloadHash', NULL, NULL),
     (N'UX_SSG_ORDER_ITEM_Latest', N'SSG_ORDER_ITEM', 1, N'OrdNo, OrdItemSeq, ShppNo, ShppSeq', NULL, N'IsLatest = 1'),
 
+    (N'IX_CJ_ONSTYLE_ORDER_ITEM_CollectionRunId', N'CJ_ONSTYLE_ORDER_ITEM', 0, N'CollectionRunId', NULL, NULL),
+    (N'IX_CJ_ONSTYLE_ORDER_ITEM_Identity_CollectedAt', N'CJ_ONSTYLE_ORDER_ITEM', 0, N'OrderNo, OrderItemSequence, OrderDetailSequence, OrderProcessingSequence, CollectedAt DESC', N'DeliveryStatus, TrackingNumber', NULL),
+    (N'IX_CJ_ONSTYLE_ORDER_ITEM_Identity_PayloadHash', N'CJ_ONSTYLE_ORDER_ITEM', 0, N'OrderNo, OrderItemSequence, OrderDetailSequence, OrderProcessingSequence, PayloadHash', NULL, NULL),
+    (N'UX_CJ_ONSTYLE_ORDER_ITEM_Latest', N'CJ_ONSTYLE_ORDER_ITEM', 1, N'OrderNo, OrderItemSequence, OrderDetailSequence, OrderProcessingSequence', NULL, N'IsLatest = 1'),
+
     (N'IX_TOSS_SHOPPING_ORDER_ITEM_CollectionRunId', N'TOSS_SHOPPING_ORDER_ITEM', 0, N'CollectionRunId', NULL, NULL),
     (N'IX_TOSS_SHOPPING_ORDER_ITEM_Identity_CollectedAt', N'TOSS_SHOPPING_ORDER_ITEM', 0, N'OrderProductId, CollectedAt DESC', N'OrderId, OrderProductStatus, DeliveryCompanyCode, ShippingTrackingNumber', NULL),
     (N'IX_TOSS_SHOPPING_ORDER_ITEM_Identity_PayloadHash', N'TOSS_SHOPPING_ORDER_ITEM', 0, N'OrderProductId, PayloadHash', NULL, NULL),

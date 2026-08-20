@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from hmr_order_collection.channels.base import ChannelAdapter
+from hmr_order_collection.channels.cj_onstyle import CjOnstyleAdapter
 from hmr_order_collection.channels.coupang import CoupangAdapter
 from hmr_order_collection.channels.elevenst import ElevenstAdapter
 from hmr_order_collection.channels.godomall import GodomallAdapter
@@ -20,6 +21,7 @@ CHANNEL_NAMES = (
     "lotteon",
     "elevenst",
     "ssg",
+    "cj_onstyle",
     "toss",
 )
 
@@ -32,6 +34,7 @@ MAXIMUM_WINDOW_DAYS = {
     "lotteon": 1,
     "elevenst": 1,
     "ssg": 180,
+    "cj_onstyle": 31,
     "toss": 31,
 }
 
@@ -53,5 +56,6 @@ def build_adapter_registry(config: AppConfig) -> dict[str, ChannelAdapter]:
         "lotteon": LotteonAdapter(config),
         "elevenst": ElevenstAdapter(config),
         "ssg": SsgAdapter(config),
+        "cj_onstyle": CjOnstyleAdapter(config),
         "toss": TossShoppingAdapter(config),
     }
