@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable, Iterable
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from datetime import date, datetime, timedelta, timezone
+import heapq
 import json
 from pathlib import Path
 import sys
@@ -30,30 +32,69 @@ def _category(error: Exception) -> str:
 
 def orchestrate(*, channels: Iterable[str], run_date: date, audit: Any,
                 execute: Callable[[str, date], dict[str, int]], sleep: Callable[[float], None],
-                retry_attempts: int = 2, retry_delay_seconds: int = 600) -> tuple[int, dict[str, Any]]:
+                retry_attempts: int = 2, retry_delay_seconds: int = 600,
+                max_workers: int = 4) -> tuple[int, dict[str, Any]]:
+    channels = tuple(channels)
+    if max_workers < 1 or max_workers > len(channels):
+        raise ValueError("max_workers must be between 1 and the channel count")
+    if retry_attempts < 0:
+        raise ValueError("retry_attempts must not be negative")
+    if retry_delay_seconds < 0:
+        raise ValueError("retry_delay_seconds must not be negative")
     if not audit.acquire_lock():
         return 2, {"status": "ALREADY_RUNNING", "channels": []}
     run_id = uuid4()
     audit.start_run(run_id, run_date, datetime.now(timezone.utc))
-    results = []
-    for channel in channels:
-        final = None
-        for attempt in range(1, retry_attempts + 2):
-            started = datetime.now(timezone.utc)
-            try:
-                counts = execute(channel, run_date)
-                status = "SUCCESS_WITH_DATA" if counts.get("records", 0) else "SUCCESS_EMPTY"
-                category = None
-            except Exception as error:
-                counts = {}
-                status = category = _category(error)
-            finished = datetime.now(timezone.utc)
-            audit.record_attempt(run_id, channel, attempt, started, finished, status, counts, category)
-            final = {"channel": channel, "status": status, "attempts": attempt,
-                     **{key: counts.get(key, 0) for key in ("windows", "pages", "records", "inserted", "changed", "skipped")}}
-            if status.startswith("SUCCESS_"): break
-            if attempt <= retry_attempts: sleep(retry_delay_seconds)
-        results.append(final)
+
+    count_keys = ("windows", "pages", "records", "inserted", "changed", "skipped")
+    final_results: dict[str, dict[str, Any]] = {}
+    logical_now = time.monotonic()
+    ready: list[tuple[float, int, int]] = [
+        (logical_now, index, 1) for index in range(len(channels))
+    ]
+    heapq.heapify(ready)
+    in_flight: dict[Future[dict[str, int]], tuple[int, int, datetime]] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        while ready or in_flight:
+            logical_now = max(logical_now, time.monotonic())
+            while ready and ready[0][0] <= logical_now and len(in_flight) < max_workers:
+                _, index, attempt = heapq.heappop(ready)
+                started = datetime.now(timezone.utc)
+                future = pool.submit(execute, channels[index], run_date)
+                in_flight[future] = (index, attempt, started)
+
+            if not in_flight:
+                next_ready = ready[0][0]
+                delay = max(0.0, next_ready - logical_now)
+                sleep(delay)
+                logical_now = next_ready
+                continue
+
+            completed, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+            for future in completed:
+                index, attempt, started = in_flight.pop(future)
+                channel = channels[index]
+                try:
+                    counts = future.result()
+                    status = "SUCCESS_WITH_DATA" if counts.get("records", 0) else "SUCCESS_EMPTY"
+                    category = None
+                except Exception as error:
+                    counts = {}
+                    status = category = _category(error)
+                finished = datetime.now(timezone.utc)
+                audit.record_attempt(run_id, channel, attempt, started, finished, status, counts, category)
+                final_results[channel] = {
+                    "channel": channel,
+                    "status": status,
+                    "attempts": attempt,
+                    **{key: counts.get(key, 0) for key in count_keys},
+                }
+                if not status.startswith("SUCCESS_") and attempt <= retry_attempts:
+                    retry_at = max(logical_now, time.monotonic()) + retry_delay_seconds
+                    heapq.heappush(ready, (retry_at, index, attempt + 1))
+
+    results = [final_results[channel] for channel in channels]
     successful = sum(item["status"].startswith("SUCCESS_") for item in results)
     failed = len(results) - successful
     status = "SUCCESS" if not failed else "PARTIAL" if successful else "FAILED"
