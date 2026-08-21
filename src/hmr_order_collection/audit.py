@@ -7,6 +7,36 @@ from typing import Any, Mapping
 from uuid import UUID
 
 
+class ApplicationLock:
+    """Session-owned SQL Server application lock."""
+
+    def __init__(self, connection: Any) -> None:
+        self._connection = connection
+
+    def acquire(self, resource: str) -> bool:
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(
+                "DECLARE @result int; EXEC @result = sys.sp_getapplock "
+                "@Resource=%s, @LockMode='Exclusive', @LockOwner='Session', @LockTimeout=0; SELECT @result",
+                (resource,),
+            )
+            row = cursor.fetchone()
+            return row is not None and int(row[0]) >= 0
+        finally:
+            cursor.close()
+
+    def release(self, resource: str) -> None:
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(
+                "EXEC sys.sp_releaseapplock @Resource=%s, @LockOwner='Session'",
+                (resource,),
+            )
+        finally:
+            cursor.close()
+
+
 class AuditRepository:
     def __init__(self, connection: Any) -> None:
         self._connection = connection
@@ -23,12 +53,24 @@ class AuditRepository:
             cursor.close()
 
     def acquire_lock(self) -> bool:
-        row = self._execute(
-            "DECLARE @result int; EXEC @result = sys.sp_getapplock "
-            "@Resource=%s, @LockMode='Exclusive', @LockOwner='Session', @LockTimeout=0; SELECT @result",
-            ("HMR_DAILY_ORDER_COLLECTION",), fetch=True,
-        )
-        return row is not None and int(row[0]) >= 0
+        return ApplicationLock(self._connection).acquire("HMR_DAILY_ORDER_COLLECTION")
+
+    def recover_stale_runs(self, cutoff: datetime, recovered_at: datetime) -> int:
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(
+                "UPDATE dbo.CHANNEL_COLLECTION_RUN SET FinishedAt=%s,RunStatus='ABORTED' "
+                "WHERE RunStatus='RUNNING' AND StartedAt < %s",
+                (recovered_at, cutoff),
+            )
+            count = int(cursor.rowcount)
+            self._connection.commit()
+            return count
+        except Exception:
+            self._connection.rollback()
+            raise
+        finally:
+            cursor.close()
 
     def start_run(self, run_id: UUID, scheduled_date: date, started_at: datetime) -> None:
         self._execute(

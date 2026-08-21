@@ -2,12 +2,13 @@ from datetime import date, datetime, timezone
 import unittest
 from uuid import UUID
 
-from hmr_order_collection.audit import AuditRepository
+from hmr_order_collection.audit import ApplicationLock, AuditRepository
 
 
 class Cursor:
-    def __init__(self, lock_result=0):
+    def __init__(self, lock_result=0, rowcount=0):
         self.lock_result = lock_result
+        self.rowcount = rowcount
         self.calls = []
         self.closed = False
     def execute(self, sql, params=()):
@@ -19,8 +20,8 @@ class Cursor:
 
 
 class Connection:
-    def __init__(self, lock_result=0):
-        self.cursor_value = Cursor(lock_result)
+    def __init__(self, lock_result=0, rowcount=0):
+        self.cursor_value = Cursor(lock_result, rowcount)
         self.commits = 0
         self.rollbacks = 0
         self.closed = False
@@ -35,6 +36,25 @@ class Connection:
 
 
 class AuditRepositoryTests(unittest.TestCase):
+    def test_application_lock_uses_exact_resource_and_releases_acquired_lock(self):
+        connection = Connection(0)
+        lock = ApplicationLock(connection)
+
+        self.assertTrue(lock.acquire("HMR_ORDER_COLLECTION:naver"))
+        lock.release("HMR_ORDER_COLLECTION:naver")
+
+        self.assertEqual(connection.cursor_value.calls[0][1], ("HMR_ORDER_COLLECTION:naver",))
+        self.assertIn("sp_releaseapplock", connection.cursor_value.calls[1][0])
+        self.assertEqual(connection.cursor_value.calls[1][1], ("HMR_ORDER_COLLECTION:naver",))
+
+    def test_application_lock_denial_returns_false_without_release(self):
+        connection = Connection(-1)
+        lock = ApplicationLock(connection)
+
+        self.assertFalse(lock.acquire("HMR_ORDER_COLLECTION:ssg"))
+
+        self.assertEqual(len(connection.cursor_value.calls), 1)
+
     def test_lock_result_controls_overlap(self):
         self.assertTrue(AuditRepository(Connection(0)).acquire_lock())
         self.assertFalse(AuditRepository(Connection(-1)).acquire_lock())
@@ -56,6 +76,20 @@ class AuditRepositoryTests(unittest.TestCase):
         connection = Connection()
         AuditRepository(connection).close()
         self.assertTrue(connection.closed)
+
+    def test_recover_stale_runs_commits_and_returns_updated_count(self):
+        connection = Connection(rowcount=2)
+        repo = AuditRepository(connection)
+        cutoff = datetime(2026, 8, 21, 1, tzinfo=timezone.utc)
+        recovered_at = datetime(2026, 8, 21, 4, tzinfo=timezone.utc)
+
+        count = repo.recover_stale_runs(cutoff, recovered_at)
+
+        self.assertEqual(count, 2)
+        sql, params = connection.cursor_value.calls[-1]
+        self.assertIn("RunStatus='ABORTED'", sql)
+        self.assertEqual(params, (recovered_at, cutoff))
+        self.assertEqual(connection.commits, 1)
 
 
 if __name__ == "__main__":
