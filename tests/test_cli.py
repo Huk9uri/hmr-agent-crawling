@@ -223,6 +223,42 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("secret", json.dumps(output))
         self.assertTrue(connection.closed)
 
+    def test_collect_all_stops_after_lock_release_failure(self):
+        events = []
+
+        class EventAdapter(FakeAdapter):
+            def __init__(self, channel):
+                super().__init__()
+                self.channel = channel
+
+            def fetch(self, window):
+                events.append(("fetch", self.channel))
+                return super().fetch(window)
+
+        class FirstReleaseFails:
+            def acquire(self, resource):
+                events.append(("acquire", resource))
+                return True
+
+            def release(self, resource):
+                events.append(("release", resource))
+                raise RuntimeError("secret")
+
+        code, output, _error, _calls, _writer, connection = self.invoke(
+            ["collect-all", "--to", "2026-08-10", "--maximum-window", "--write-db"],
+            adapters={"naver": EventAdapter("naver"), "coupang": EventAdapter("coupang")},
+            lock_factory=lambda _connection: FirstReleaseFails(),
+        )
+
+        self.assertEqual(code, 1)
+        self.assertEqual(len(output["channels"]), 1)
+        self.assertEqual(events, [
+            ("acquire", "HMR_ORDER_COLLECTION:naver"),
+            ("fetch", "naver"),
+            ("release", "HMR_ORDER_COLLECTION:naver"),
+        ])
+        self.assertTrue(connection.closed)
+
     def test_write_mode_lock_denial_skips_channel_and_dry_run_never_builds_lock(self):
         lock_calls = []
 

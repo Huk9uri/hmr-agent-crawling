@@ -280,6 +280,7 @@ def main(
     try:
         for channel in channels:
             acquired = False
+            release_failed = False
             resource = f"HMR_ORDER_COLLECTION:{channel}"
             try:
                 if channel_lock is not None:
@@ -321,6 +322,7 @@ def main(
                     try:
                         channel_lock.release(resource)
                     except Exception:
+                        release_failed = True
                         if channel_summaries and channel_summaries[-1]["channel"] == channel:
                             if channel_summaries[-1]["status"] == "ok":
                                 failure_count += 1
@@ -334,6 +336,8 @@ def main(
                             )
                             channel_summaries.append(summary)
                             failure_count += 1
+            if release_failed:
+                break
     finally:
         if connection is not None:
             try:
