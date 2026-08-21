@@ -14,20 +14,12 @@ import time
 from typing import Any
 from uuid import uuid4
 
-from hmr_order_collection.audit import ApplicationLock, AuditRepository
+from hmr_order_collection.audit import ApplicationLock, AuditRepository, ChannelLockError
 from hmr_order_collection.channels import CHANNEL_NAMES, MAXIMUM_WINDOW_DAYS, build_adapter_registry
 from hmr_order_collection.channels.base import DateWindow
 from hmr_order_collection.config import ConfigurationError, load_config
 from hmr_order_collection.database import DatabaseWriter, connect_from_config
 from hmr_order_collection.http import HttpResponseError
-
-
-class ChannelLockError(RuntimeError):
-    """Raised when another process owns a channel attempt lock."""
-
-    def __init__(self, channel: str) -> None:
-        self.channel = channel
-        super().__init__("Channel collection is already running")
 
 
 def _category(error: Exception) -> str:

@@ -7,6 +7,14 @@ from typing import Any, Mapping
 from uuid import UUID
 
 
+class ChannelLockError(RuntimeError):
+    """Raised when another process owns a channel attempt lock."""
+
+    def __init__(self, channel: str) -> None:
+        self.channel = channel
+        super().__init__("Channel collection is already running")
+
+
 class ApplicationLock:
     """Session-owned SQL Server application lock."""
 

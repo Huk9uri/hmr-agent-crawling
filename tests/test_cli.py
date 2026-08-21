@@ -67,6 +67,14 @@ class FakeConnection:
             raise self.close_error
 
 
+class PermissiveLock:
+    def acquire(self, resource):
+        return True
+
+    def release(self, resource):
+        pass
+
+
 def config(values=None):
     return AppConfig(MappingProxyType(dict(values or {})))
 
@@ -98,6 +106,7 @@ class CliTests(unittest.TestCase):
         writer=None,
         connection=None,
         connection_error=None,
+        lock_factory=None,
     ):
         from hmr_order_collection.cli import main
 
@@ -129,11 +138,97 @@ class CliTests(unittest.TestCase):
             registry_builder=build,
             connection_factory=connect,
             writer_factory=lambda _connection: fake_writer,
+            lock_factory=lock_factory or (lambda _connection: PermissiveLock()),
             stdout=stdout,
             stderr=stderr,
         )
         output = json.loads(stdout.getvalue()) if stdout.getvalue() else None
         return code, output, stderr.getvalue(), calls, fake_writer, fake_connection
+
+    def test_write_mode_holds_channel_lock_around_channel_execution(self):
+        events = []
+
+        class EventAdapter(FakeAdapter):
+            def fetch(self, window):
+                events.append("fetch")
+                return super().fetch(window)
+
+        class EventWriter(FakeWriter):
+            def write(self, channel, records, run_id):
+                events.append("write")
+                return super().write(channel, records, run_id)
+
+        class EventLock:
+            def acquire(self, resource):
+                events.append(("acquire", resource))
+                return True
+
+            def release(self, resource):
+                events.append(("release", resource))
+
+        code, _output, _error, _calls, _writer, connection = self.invoke(
+            ["collect", "--channel", "naver", "--from", "2026-08-10", "--to", "2026-08-10", "--write-db"],
+            adapters={"naver": EventAdapter()}, writer=EventWriter(),
+            lock_factory=lambda _connection: EventLock(),
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(events, [
+            ("acquire", "HMR_ORDER_COLLECTION:naver"), "fetch", "write",
+            ("release", "HMR_ORDER_COLLECTION:naver"),
+        ])
+        self.assertTrue(connection.closed)
+
+    def test_write_mode_releases_lock_when_writer_fails(self):
+        events = []
+
+        class FailingWriter(FakeWriter):
+            def write(self, channel, records, run_id):
+                raise RuntimeError("secret")
+
+        class EventLock:
+            def acquire(self, resource):
+                events.append("acquire")
+                return True
+
+            def release(self, resource):
+                events.append("release")
+
+        code, output, _error, _calls, _writer, connection = self.invoke(
+            ["collect", "--channel", "naver", "--from", "2026-08-10", "--to", "2026-08-10", "--write-db"],
+            writer=FailingWriter(), lock_factory=lambda _connection: EventLock(),
+        )
+
+        self.assertEqual(code, 1)
+        self.assertEqual(output["channels"][0]["status"], "failed")
+        self.assertEqual(events, ["acquire", "release"])
+        self.assertTrue(connection.closed)
+
+    def test_write_mode_lock_denial_skips_channel_and_dry_run_never_builds_lock(self):
+        lock_calls = []
+
+        class DeniedLock:
+            def acquire(self, resource):
+                lock_calls.append(("acquire", resource))
+                return False
+
+            def release(self, resource):
+                lock_calls.append(("release", resource))
+
+        write_code, write_output, _error, _calls, writer, _connection = self.invoke(
+            ["collect", "--channel", "naver", "--from", "2026-08-10", "--to", "2026-08-10", "--write-db"],
+            lock_factory=lambda _connection: DeniedLock(),
+        )
+        dry_code, _dry_output, _error, _calls, _writer, _connection = self.invoke(
+            ["collect", "--channel", "naver", "--from", "2026-08-10", "--to", "2026-08-10"],
+            lock_factory=lambda _connection: self.fail("dry-run must not create a lock"),
+        )
+
+        self.assertEqual(write_code, 1)
+        self.assertEqual(write_output["channels"][0]["error_type"], "ChannelLockError")
+        self.assertEqual(writer.calls, [])
+        self.assertEqual(lock_calls, [("acquire", "HMR_ORDER_COLLECTION:naver")])
+        self.assertEqual(dry_code, 0)
 
     def test_list_reports_all_channels_without_loading_secrets(self):
         code, output, error, calls, _writer, _connection = self.invoke(["list"])

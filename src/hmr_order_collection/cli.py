@@ -11,6 +11,7 @@ import sys
 from typing import Any, TextIO
 from uuid import uuid4
 
+from hmr_order_collection.audit import ApplicationLock, ChannelLockError
 from hmr_order_collection.channels import (
     BOUNDARY_PROBE_START_DAYS,
     CHANNEL_NAMES,
@@ -219,6 +220,7 @@ def main(
     registry_builder: Callable[[AppConfig], Mapping[str, ChannelAdapter]] = build_adapter_registry,
     connection_factory: Callable[[AppConfig], Any] = connect_from_config,
     writer_factory: Callable[[Any], DatabaseWriter] = DatabaseWriter,
+    lock_factory: Callable[[Any], ApplicationLock] = ApplicationLock,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
@@ -262,10 +264,12 @@ def main(
 
     connection = None
     writer = None
+    channel_lock = None
     if args.write_db:
         try:
             connection = connection_factory(config)
             writer = writer_factory(connection)
+            channel_lock = lock_factory(connection)
         except Exception:
             stderr.write("error: database connection failed\n")
             return 2
@@ -275,7 +279,15 @@ def main(
     close_failed = False
     try:
         for channel in channels:
+            acquired = False
+            resource = f"HMR_ORDER_COLLECTION:{channel}"
             try:
+                if channel_lock is not None:
+                    acquired = channel_lock.acquire(resource)
+                    if not acquired:
+                        summary = _empty_summary(channel)
+                        summary.update(status="failed", error_type=ChannelLockError.__name__)
+                        raise ChannelRunFailure(summary)
                 windows = _windows_for_channel(
                     channel,
                     start=start,
@@ -304,6 +316,9 @@ def main(
                 channel_summaries.append(error.summary)
                 if not args.continue_on_error:
                     break
+            finally:
+                if acquired:
+                    channel_lock.release(resource)
     finally:
         if connection is not None:
             try:
