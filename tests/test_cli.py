@@ -71,6 +71,24 @@ def config(values=None):
     return AppConfig(MappingProxyType(dict(values or {})))
 
 
+class AppConfigTests(unittest.TestCase):
+    def test_orchestrator_worker_count_defaults_to_four_and_accepts_channel_bound(self):
+        self.assertEqual(config().orchestrator_max_workers(8), 4)
+        for value in ("1", "4", "8"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    config({"ORCHESTRATOR_MAX_WORKERS": value}).orchestrator_max_workers(8),
+                    int(value),
+                )
+
+    def test_orchestrator_worker_count_rejects_invalid_values_without_echoing_them(self):
+        for value in ("0", "9", "not-an-integer", ""):
+            with self.subTest(value=value):
+                with self.assertRaises(ConfigurationError) as raised:
+                    config({"ORCHESTRATOR_MAX_WORKERS": value}).orchestrator_max_workers(8)
+                self.assertNotIn(value or "<blank>", str(raised.exception))
+
+
 class CliTests(unittest.TestCase):
     def invoke(
         self,

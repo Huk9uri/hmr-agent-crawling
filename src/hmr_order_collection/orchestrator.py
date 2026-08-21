@@ -14,7 +14,7 @@ import time
 from typing import Any
 from uuid import uuid4
 
-from hmr_order_collection.audit import AuditRepository
+from hmr_order_collection.audit import ApplicationLock, AuditRepository
 from hmr_order_collection.channels import CHANNEL_NAMES, MAXIMUM_WINDOW_DAYS, build_adapter_registry
 from hmr_order_collection.channels.base import DateWindow
 from hmr_order_collection.config import ConfigurationError, load_config
@@ -22,7 +22,16 @@ from hmr_order_collection.database import DatabaseWriter, connect_from_config
 from hmr_order_collection.http import HttpResponseError
 
 
+class ChannelLockError(RuntimeError):
+    """Raised when another process owns a channel attempt lock."""
+
+    def __init__(self, channel: str) -> None:
+        self.channel = channel
+        super().__init__("Channel collection is already running")
+
+
 def _category(error: Exception) -> str:
+    if isinstance(error, ChannelLockError): return "FAILED_LOCK"
     if isinstance(error, ConfigurationError): return "FAILED_CONFIG"
     if isinstance(error, HttpResponseError): return "FAILED_API"
     if isinstance(error, (ValueError, TypeError, KeyError)): return "FAILED_PARSE"
@@ -33,7 +42,7 @@ def _category(error: Exception) -> str:
 def orchestrate(*, channels: Iterable[str], run_date: date, audit: Any,
                 execute: Callable[[str, date], dict[str, int]], sleep: Callable[[float], None],
                 retry_attempts: int = 2, retry_delay_seconds: int = 600,
-                max_workers: int = 4) -> tuple[int, dict[str, Any]]:
+                max_workers: int = 4, lock_already_acquired: bool = False) -> tuple[int, dict[str, Any]]:
     channels = tuple(channels)
     if max_workers < 1 or max_workers > len(channels):
         raise ValueError("max_workers must be between 1 and the channel count")
@@ -41,7 +50,7 @@ def orchestrate(*, channels: Iterable[str], run_date: date, audit: Any,
         raise ValueError("retry_attempts must not be negative")
     if retry_delay_seconds < 0:
         raise ValueError("retry_delay_seconds must not be negative")
-    if not audit.acquire_lock():
+    if not lock_already_acquired and not audit.acquire_lock():
         return 2, {"status": "ALREADY_RUNNING", "channels": []}
     run_id = uuid4()
     audit.start_run(run_id, run_date, datetime.now(timezone.utc))
@@ -102,19 +111,33 @@ def orchestrate(*, channels: Iterable[str], run_date: date, audit: Any,
     return (0 if not failed else 1), {"status": status, "channels": results}
 
 
-def _executor(config_path: Path) -> Callable[[str, date], dict[str, int]]:
+def _executor(
+    config_path: Path,
+    *,
+    connection_factory: Callable[[Any], Any] = connect_from_config,
+    registry_builder: Callable[[Any], dict[str, Any]] = build_adapter_registry,
+    writer_factory: Callable[[Any], Any] = DatabaseWriter,
+) -> Callable[[str, date], dict[str, int]]:
     config = load_config(config_path)
     def execute(channel: str, run_date: date) -> dict[str, int]:
-        adapter = build_adapter_registry(config)[channel]
-        start = run_date - timedelta(days=MAXIMUM_WINDOW_DAYS[channel] - 1)
-        records = list(adapter.fetch(DateWindow(start, run_date)))
-        connection = connect_from_config(config)
+        connection = connection_factory(config)
+        resource = f"HMR_ORDER_COLLECTION:{channel}"
+        lock = ApplicationLock(connection)
+        acquired = False
         try:
-            written = DatabaseWriter(connection).write(channel, records, uuid4())
+            acquired = lock.acquire(resource)
+            if not acquired:
+                raise ChannelLockError(channel)
+            adapter = registry_builder(config)[channel]
+            start = run_date - timedelta(days=MAXIMUM_WINDOW_DAYS[channel] - 1)
+            records = list(adapter.fetch(DateWindow(start, run_date)))
+            written = writer_factory(connection).write(channel, records, uuid4())
+            return {"windows": 1, "pages": adapter.pages_fetched, "records": len(records),
+                    "inserted": written.inserted, "changed": written.changed, "skipped": written.skipped}
         finally:
+            if acquired:
+                lock.release(resource)
             connection.close()
-        return {"windows": 1, "pages": adapter.pages_fetched, "records": len(records),
-                "inserted": written.inserted, "changed": written.changed, "skipped": written.skipped}
     return execute
 
 
@@ -129,10 +152,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = load_config(args.config)
         audit = AuditRepository(connect_from_config(config))
-        code, payload = orchestrate(
-            channels=CHANNEL_NAMES, run_date=args.date, audit=audit, execute=_executor(args.config),
-            sleep=time.sleep, retry_attempts=args.retry_attempts, retry_delay_seconds=args.retry_delay_seconds,
-        )
+        if not audit.acquire_lock():
+            code, payload = 2, {"status": "ALREADY_RUNNING", "channels": []}
+        else:
+            recovered_at = datetime.now(timezone.utc)
+            audit.recover_stale_runs(recovered_at - timedelta(hours=3), recovered_at)
+            code, payload = orchestrate(
+                channels=CHANNEL_NAMES, run_date=args.date, audit=audit, execute=_executor(args.config),
+                sleep=time.sleep, retry_attempts=args.retry_attempts, retry_delay_seconds=args.retry_delay_seconds,
+                max_workers=config.orchestrator_max_workers(len(CHANNEL_NAMES)), lock_already_acquired=True,
+            )
     except Exception as error:
         code, payload = 2, {"status": "FAILED", "error_category": _category(error), "channels": []}
     finally:

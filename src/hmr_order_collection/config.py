@@ -31,6 +31,17 @@ class AppConfig:
             raise ConfigurationError(f"Missing required configuration: {key}")
         return value
 
+    def orchestrator_max_workers(self, channel_count: int) -> int:
+        message = "ORCHESTRATOR_MAX_WORKERS must be an integer between 1 and the channel count"
+        raw_value = self.values.get("ORCHESTRATOR_MAX_WORKERS", "4")
+        try:
+            value = int(raw_value)
+        except (TypeError, ValueError) as error:
+            raise ConfigurationError(message) from error
+        if not 1 <= value <= channel_count:
+            raise ConfigurationError(message)
+        return value
+
 
 def _parse_value(raw_value: str, line_number: int) -> str:
     value = raw_value.strip()
