@@ -74,6 +74,14 @@ messages, response bodies, PII, API credentials, or database credentials.
 Use `--continue-on-error` to attempt later channels after a channel failure.
 The process still exits nonzero when any channel fails.
 
+Write mode uses the same SQL Server application lock as the daily
+orchestrator: `HMR_ORDER_COLLECTION:{channel}`. The lock covers API collection
+and the channel's write transaction and is released immediately afterward.
+The automatic orchestrator uses an independent connection and transaction per
+channel, runs up to `ORCHESTRATOR_MAX_WORKERS=4` attempts concurrently, and
+does not retain a worker or channel lock while a retry is waiting. Set the
+value to `1` for an emergency sequential fallback.
+
 The initial maximum-window policy always ends on the explicit `--to` date:
 
 | Channel | Inclusive days | Current basis |
@@ -136,7 +144,7 @@ an unsuccessful or partial probe.
 
 `099_drop_channel_order_tables.sql`은 기본값에서 실행을 거부한다. 삭제가 승인된 비운영 검증 DB에서만 파일 상단의 `CONFIRM_DROP` 값을 `YES`로 변경해 실행한다.
 
-이 스크립트는 위 7개 테이블만 삭제하며 `dbo` 스키마나 다른 `ecommerce` 객체는 변경하지 않는다.
+이 스크립트는 위 8개 테이블만 삭제하며 `dbo` 스키마나 다른 `ecommerce` 객체는 변경하지 않는다.
 
 ## 현재 배포 상태
 

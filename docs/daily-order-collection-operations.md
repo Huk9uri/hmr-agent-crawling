@@ -2,7 +2,9 @@
 
 ## What is automated
 
-The orchestrator runs the eight deployed channels independently: Naver SmartStore, Godomall, Coupang, LotteON, 11st, SSG.COM, CJ OnStyle, and Toss Shopping. It uses each channel's verified maximum safe window, retries failures twice at ten-minute intervals, records every attempt in SQL Server, and returns nonzero when any channel remains failed.
+The orchestrator runs the eight deployed channels independently: Naver SmartStore, Godomall, Coupang, LotteON, 11st, SSG.COM, CJ OnStyle, and Toss Shopping. By default it runs no more than four channel attempts concurrently. A failed attempt is returned to a delayed retry queue, so its ten-minute wait does not occupy a worker or block another ready channel. Every attempt is recorded in SQL Server, and the process returns nonzero when any channel remains failed.
+
+Each attempt opens its own SQL connection and holds `HMR_ORDER_COLLECTION:{channel}` from API collection through that channel's single database transaction. The lock is released as soon as the attempt finishes. Consequently, a failure rolls back only that channel's write, and a manual write cannot overlap the scheduled write for the same channel. The coordinator holds the existing run-wide lock for the complete scheduled run.
 
 Email notification and the separate missing-run watchdog will be added after a corporate SMTP account is issued.
 
@@ -11,6 +13,7 @@ Email notification and the separate missing-run watchdog will be added after a c
 - Copy or clone the project onto the actual collection server PC.
 - Install Python 3.12 and `pip install -r requirements.txt` in a stable server-owned virtual environment.
 - Place `.env` outside source control and restrict it to Administrators and `SYSTEM`.
+- Set `ORCHESTRATOR_MAX_WORKERS=4` in `.env`. Accepted values are 1 through the registered channel count.
 - Confirm the server's public IP is the IP registered with every marketplace.
 - Confirm `SYSTEM` can read the project, Python executable, `.env`, and write the log directory.
 - Apply `080_create_collection_audit_tables.sql` and run `085_verify_collection_audit_tables.sql`.
@@ -58,6 +61,22 @@ ORDER BY a.StartedAt DESC;
 ```
 
 `SUCCESS_EMPTY` means the API succeeded but returned no orders. It is not a failure. `FAILED_API`, `FAILED_PARSE`, `FAILED_DB`, `FAILED_CONFIG`, and `FAILED_INTERNAL` require investigation.
+
+`FAILED_LOCK` means the channel was already being collected by another scheduled or manual process. A `RUNNING` audit row older than three hours is changed to `ABORTED` when the next run obtains the run-wide lock. This recovery changes audit state only; it does not undo API reads or already committed channel transactions.
+
+To temporarily return to sequential operation during incident response, set `ORCHESTRATOR_MAX_WORKERS=1` and run the same launcher. No Windows Task Scheduler registration change is required because the launcher intentionally does not hard-code a worker count.
+
+To confirm overlap is bounded and retries do not block other channels, compare attempt intervals for one run:
+
+```sql
+SELECT ChannelName, AttemptNo, AttemptStatus, StartedAt, FinishedAt,
+       DATEDIFF(second, StartedAt, FinishedAt) AS DurationSeconds
+FROM dbo.CHANNEL_COLLECTION_ATTEMPT
+WHERE RunId = '00000000-0000-0000-0000-000000000000'
+ORDER BY StartedAt, ChannelName, AttemptNo;
+```
+
+Replace the sample `RunId` with a value from `CHANNEL_COLLECTION_RUN`. Overlapping `StartedAt`/`FinishedAt` intervals show parallel execution; no more than the configured worker count should overlap.
 
 ## Remove the task
 
