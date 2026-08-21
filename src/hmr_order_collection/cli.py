@@ -318,7 +318,22 @@ def main(
                     break
             finally:
                 if acquired:
-                    channel_lock.release(resource)
+                    try:
+                        channel_lock.release(resource)
+                    except Exception:
+                        if channel_summaries and channel_summaries[-1]["channel"] == channel:
+                            if channel_summaries[-1]["status"] == "ok":
+                                failure_count += 1
+                            channel_summaries[-1].update(
+                                status="failed", error_type=ChannelLockError.__name__
+                            )
+                        else:
+                            summary = _empty_summary(channel)
+                            summary.update(
+                                status="failed", error_type=ChannelLockError.__name__
+                            )
+                            channel_summaries.append(summary)
+                            failure_count += 1
     finally:
         if connection is not None:
             try:

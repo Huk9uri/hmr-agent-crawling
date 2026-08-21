@@ -204,6 +204,25 @@ class CliTests(unittest.TestCase):
         self.assertEqual(events, ["acquire", "release"])
         self.assertTrue(connection.closed)
 
+    def test_write_mode_sanitizes_lock_release_failure_and_closes_connection(self):
+        class FailingReleaseLock:
+            def acquire(self, resource):
+                return True
+
+            def release(self, resource):
+                raise RuntimeError("secret lock detail")
+
+        code, output, error, _calls, _writer, connection = self.invoke(
+            ["collect", "--channel", "naver", "--from", "2026-08-10", "--to", "2026-08-10", "--write-db"],
+            lock_factory=lambda _connection: FailingReleaseLock(),
+        )
+
+        self.assertEqual(code, 1)
+        self.assertEqual(error, "")
+        self.assertEqual(output["channels"][0]["status"], "failed")
+        self.assertNotIn("secret", json.dumps(output))
+        self.assertTrue(connection.closed)
+
     def test_write_mode_lock_denial_skips_channel_and_dry_run_never_builds_lock(self):
         lock_calls = []
 

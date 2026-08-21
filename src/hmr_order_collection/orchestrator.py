@@ -56,7 +56,8 @@ def orchestrate(*, channels: Iterable[str], run_date: date, audit: Any,
     heapq.heapify(ready)
     in_flight: dict[Future[dict[str, int]], tuple[int, int, datetime]] = {}
 
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+    pool = ThreadPoolExecutor(max_workers=max_workers)
+    try:
         while ready or in_flight:
             logical_now = max(logical_now, time.monotonic())
             while ready and ready[0][0] <= logical_now and len(in_flight) < max_workers:
@@ -72,7 +73,10 @@ def orchestrate(*, channels: Iterable[str], run_date: date, audit: Any,
                 logical_now = next_ready
                 continue
 
-            completed, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+            timeout = None
+            if ready and len(in_flight) < max_workers:
+                timeout = max(0.0, ready[0][0] - logical_now)
+            completed, _ = wait(in_flight, timeout=timeout, return_when=FIRST_COMPLETED)
             for future in completed:
                 index, attempt, started = in_flight.pop(future)
                 channel = channels[index]
@@ -94,6 +98,20 @@ def orchestrate(*, channels: Iterable[str], run_date: date, audit: Any,
                 if not status.startswith("SUCCESS_") and attempt <= retry_attempts:
                     retry_at = max(logical_now, time.monotonic()) + retry_delay_seconds
                     heapq.heappush(ready, (retry_at, index, attempt + 1))
+    except BaseException:
+        for future in in_flight:
+            future.cancel()
+        pool.shutdown(wait=False, cancel_futures=True)
+        successful = sum(
+            item["status"].startswith("SUCCESS_") for item in final_results.values()
+        )
+        audit.finish_run(
+            run_id, datetime.now(timezone.utc), "ABORTED",
+            successful, len(channels) - successful,
+        )
+        raise
+    else:
+        pool.shutdown(wait=True)
 
     results = [final_results[channel] for channel in channels]
     successful = sum(item["status"].startswith("SUCCESS_") for item in results)
@@ -116,6 +134,8 @@ def _executor(
         resource = f"HMR_ORDER_COLLECTION:{channel}"
         lock = ApplicationLock(connection)
         acquired = False
+        result: dict[str, int] | None = None
+        primary_error: BaseException | None = None
         try:
             acquired = lock.acquire(resource)
             if not acquired:
@@ -124,12 +144,30 @@ def _executor(
             start = run_date - timedelta(days=MAXIMUM_WINDOW_DAYS[channel] - 1)
             records = list(adapter.fetch(DateWindow(start, run_date)))
             written = writer_factory(connection).write(channel, records, uuid4())
-            return {"windows": 1, "pages": adapter.pages_fetched, "records": len(records),
-                    "inserted": written.inserted, "changed": written.changed, "skipped": written.skipped}
-        finally:
+            result = {"windows": 1, "pages": adapter.pages_fetched, "records": len(records),
+                      "inserted": written.inserted, "changed": written.changed, "skipped": written.skipped}
+        except BaseException as error:
+            primary_error = error
+
+        cleanup_error: BaseException | None = None
+        try:
             if acquired:
                 lock.release(resource)
+        except BaseException as error:
+            cleanup_error = error
+        try:
             connection.close()
+        except BaseException as error:
+            if cleanup_error is None:
+                cleanup_error = error
+
+        if primary_error is not None:
+            raise primary_error
+        if cleanup_error is not None:
+            raise cleanup_error
+        if result is None:
+            raise RuntimeError("Channel attempt produced no result")
+        return result
     return execute
 
 

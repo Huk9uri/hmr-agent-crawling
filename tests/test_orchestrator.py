@@ -3,6 +3,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -22,6 +23,50 @@ class Audit:
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_retry_deadline_wakes_coordinator_while_unrelated_attempt_is_running(self):
+        retry_started = threading.Event()
+        release_long_attempt = threading.Event()
+        attempts = {"a": 0}
+        result = {}
+
+        def execute(channel, run_date):
+            if channel == "b":
+                release_long_attempt.wait(timeout=2)
+                return {"records": 0}
+            attempts["a"] += 1
+            if attempts["a"] == 1:
+                raise RuntimeError("retry")
+            retry_started.set()
+            return {"records": 0}
+
+        def run():
+            result["value"] = orchestrate(
+                channels=("a", "b"), run_date=date(2026, 8, 21), audit=Audit(),
+                execute=execute, sleep=time.sleep, retry_attempts=1,
+                retry_delay_seconds=0.05, max_workers=2,
+            )
+
+        thread = threading.Thread(target=run)
+        thread.start()
+        started_before_long_finished = retry_started.wait(timeout=0.3)
+        release_long_attempt.set()
+        thread.join(timeout=2)
+
+        self.assertTrue(started_before_long_finished)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(result["value"][0], 0)
+
+    def test_interruption_marks_run_aborted_and_is_re_raised(self):
+        audit = Audit()
+
+        with self.assertRaises(KeyboardInterrupt):
+            orchestrate(
+                channels=("a",), run_date=date(2026, 8, 21), audit=audit,
+                execute=lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()),
+                sleep=lambda _: None, retry_attempts=0, max_workers=1,
+            )
+
+        self.assertEqual(audit.finished[2], "ABORTED")
     def test_delayed_retry_does_not_block_a_ready_channel(self):
         calls = []
         sleeps = []
@@ -125,13 +170,16 @@ class OrchestratorTests(unittest.TestCase):
 
 class AttemptExecutorTests(unittest.TestCase):
     class Cursor:
-        def __init__(self, events, lock_result=0):
+        def __init__(self, events, lock_result=0, release_error=None):
             self.events = events
             self.lock_result = lock_result
+            self.release_error = release_error
 
         def execute(self, sql, params=()):
             operation = "release" if "sp_releaseapplock" in sql else "acquire"
             self.events.append((operation, params))
+            if operation == "release" and self.release_error is not None:
+                raise self.release_error
 
         def fetchone(self):
             return (self.lock_result,)
@@ -140,9 +188,9 @@ class AttemptExecutorTests(unittest.TestCase):
             pass
 
     class Connection:
-        def __init__(self, events, lock_result=0):
+        def __init__(self, events, lock_result=0, release_error=None):
             self.events = events
-            self.cursor_value = AttemptExecutorTests.Cursor(events, lock_result)
+            self.cursor_value = AttemptExecutorTests.Cursor(events, lock_result, release_error)
 
         def cursor(self):
             return self.cursor_value
@@ -174,14 +222,14 @@ class AttemptExecutorTests(unittest.TestCase):
                 raise self.error
             return WriteSummary()
 
-    def build_executor(self, *, lock_result=0, adapter_error=None, writer_error=None):
+    def build_executor(self, *, lock_result=0, adapter_error=None, writer_error=None, release_error=None):
         all_events = []
         connections = []
 
         def connect(_config):
             events = [("connect",)]
             all_events.append(events)
-            connection = self.Connection(events, lock_result)
+            connection = self.Connection(events, lock_result, release_error)
             connections.append(connection)
             return connection
 
@@ -230,6 +278,16 @@ class AttemptExecutorTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.__class__.__name__, "ChannelLockError")
         self.assertEqual([event[0] for event in all_events[0]], ["connect", "acquire", "close"])
+
+    def test_release_failure_still_closes_connection_and_preserves_attempt_failure(self):
+        execute, all_events, _ = self.build_executor(
+            adapter_error=ValueError("primary"), release_error=RuntimeError("cleanup")
+        )
+
+        with self.assertRaisesRegex(ValueError, "primary"):
+            execute("naver", date(2026, 8, 21))
+
+        self.assertEqual([event[0] for event in all_events[0]][-2:], ["release", "close"])
 
 
 class OrchestratorMainTests(unittest.TestCase):
