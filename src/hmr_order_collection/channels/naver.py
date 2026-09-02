@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 from collections.abc import Callable, Iterator
-from datetime import date
+from datetime import date, timedelta
 import time
 from typing import Any
 
@@ -31,12 +31,18 @@ def generate_client_secret_sign(client_id: str, client_secret: str, timestamp_ms
     return base64.b64encode(hashed).decode("ascii")
 
 
-def _day_start(value: date) -> str:
-    return f"{value.isoformat()}T00:00:00.000+09:00"
-
-
-def _day_end(value: date) -> str:
-    return f"{value.isoformat()}T23:59:59.999+09:00"
+def _daily_changed_intervals(value: date) -> tuple[tuple[str, str], ...]:
+    previous = value - timedelta(days=1)
+    return (
+        (
+            f"{previous.isoformat()}T13:50:00.000+09:00",
+            f"{value.isoformat()}T13:40:00.000+09:00",
+        ),
+        (
+            f"{value.isoformat()}T13:40:00.000+09:00",
+            f"{value.isoformat()}T14:00:00.000+09:00",
+        ),
+    )
 
 
 class NaverAdapter(ChannelAdapter):
@@ -102,40 +108,43 @@ class NaverAdapter(ChannelAdapter):
     def _changed_product_order_ids(
         self, window: DateWindow, headers: dict[str, str]
     ) -> list[str]:
-        params: dict[str, Any] = {
-            "lastChangedFrom": _day_start(window.start),
-            "lastChangedTo": _day_end(window.end),
-            "limitCount": 300,
-        }
         ids: list[str] = []
         known_ids: set[str] = set()
-        seen_continuations: set[tuple[str, str]] = set()
-        while True:
-            response = self._http.request("GET", CHANGED_ORDERS_URL, headers=headers, params=params)
-            self._record_page()
-            payload = parse_json(response)
-            data = payload.get("data") or {}
-            for status in data.get("lastChangeStatuses", []):
-                product_order_id = status.get("productOrderId")
-                if product_order_id is not None:
-                    value = str(product_order_id)
-                    if value not in known_ids:
-                        known_ids.add(value)
-                        ids.append(value)
+        for interval_start, interval_end in _daily_changed_intervals(window.end):
+            params: dict[str, Any] = {
+                "lastChangedFrom": interval_start,
+                "lastChangedTo": interval_end,
+                "limitCount": 300,
+            }
+            seen_continuations: set[tuple[str, str]] = set()
+            while True:
+                response = self._http.request(
+                    "GET", CHANGED_ORDERS_URL, headers=headers, params=params
+                )
+                self._record_page()
+                payload = parse_json(response)
+                data = payload.get("data") or {}
+                for status in data.get("lastChangeStatuses", []):
+                    product_order_id = status.get("productOrderId")
+                    if product_order_id is not None:
+                        value = str(product_order_id)
+                        if value not in known_ids:
+                            known_ids.add(value)
+                            ids.append(value)
 
-            more = data.get("more")
-            if not isinstance(more, dict):
-                break
-            more_from = more.get("moreFrom")
-            more_sequence = more.get("moreSequence")
-            if not isinstance(more_from, str) or not isinstance(more_sequence, str):
-                break
-            continuation = (more_from, more_sequence)
-            if continuation in seen_continuations:
-                raise ValueError("Naver continuation cursor was repeated")
-            seen_continuations.add(continuation)
-            params["lastChangedFrom"] = more_from
-            params["moreSequence"] = more_sequence
+                more = data.get("more")
+                if not isinstance(more, dict):
+                    break
+                more_from = more.get("moreFrom")
+                more_sequence = more.get("moreSequence")
+                if not isinstance(more_from, str) or not isinstance(more_sequence, str):
+                    break
+                continuation = (more_from, more_sequence)
+                if continuation in seen_continuations:
+                    raise ValueError("Naver continuation cursor was repeated")
+                seen_continuations.add(continuation)
+                params["lastChangedFrom"] = more_from
+                params["moreSequence"] = more_sequence
         return ids
 
 

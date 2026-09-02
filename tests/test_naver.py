@@ -49,6 +49,57 @@ def config():
 
 
 class NaverAdapterTests(unittest.TestCase):
+    def test_fetch_splits_daily_window_into_2350_and_20_minute_requests(self):
+        def handler(method, url, kwargs):
+            if url.endswith("/oauth2/token"):
+                return {"access_token": "SYNTHETIC_ACCESS_TOKEN"}
+            if url.endswith("/last-changed-statuses"):
+                return {
+                    "data": {
+                        "lastChangeStatuses": [
+                            {"productOrderId": "NAVER-PRODUCT-ORDER-001"}
+                        ]
+                    }
+                }
+            return {
+                "data": [
+                    {
+                        "order": {"orderId": "NAVER-ORDER-001"},
+                        "productOrder": {
+                            "productOrderId": "NAVER-PRODUCT-ORDER-001"
+                        },
+                        "delivery": {},
+                    }
+                ]
+            }
+
+        http = FakeHttpClient(handler)
+        adapter = NaverAdapter(config(), http=http, clock_ms=lambda: 1643961623299)
+
+        records = list(
+            adapter.fetch(DateWindow(date(2026, 9, 2), date(2026, 9, 2)))
+        )
+
+        changed_calls = [
+            call for call in http.calls if call[1].endswith("/last-changed-statuses")
+        ]
+        self.assertEqual(
+            [call[2]["params"] for call in changed_calls],
+            [
+                {
+                    "lastChangedFrom": "2026-09-01T13:50:00.000+09:00",
+                    "lastChangedTo": "2026-09-02T13:40:00.000+09:00",
+                    "limitCount": 300,
+                },
+                {
+                    "lastChangedFrom": "2026-09-02T13:40:00.000+09:00",
+                    "lastChangedTo": "2026-09-02T14:00:00.000+09:00",
+                    "limitCount": 300,
+                },
+            ],
+        )
+        self.assertEqual(len(records), 1)
+
     def test_client_secret_signature_uses_the_documented_bcrypt_then_base64_algorithm(self):
         signature = generate_client_secret_sign(
             "aaaabbbbcccc", "$2b$04$abcdefghijklmnopqrstuu", 1643961623299
@@ -97,7 +148,7 @@ class NaverAdapterTests(unittest.TestCase):
         records = list(adapter.fetch(DateWindow(date(2026, 8, 10), date(2026, 8, 10))))
 
         self.assertEqual(len(records), 301)
-        self.assertEqual(adapter.pages_fetched, 4)
+        self.assertEqual(adapter.pages_fetched, 6)
         token_call = http.calls[0]
         self.assertEqual(token_call[0:2], ("POST", "https://api.commerce.naver.com/external/v1/oauth2/token"))
         self.assertEqual(
@@ -111,7 +162,7 @@ class NaverAdapterTests(unittest.TestCase):
             },
         )
         changed_calls = [call for call in http.calls if call[1].endswith("/last-changed-statuses")]
-        self.assertEqual(len(changed_calls), 2)
+        self.assertEqual(len(changed_calls), 4)
         self.assertEqual(changed_calls[1][2]["params"]["lastChangedFrom"], "2026-08-10T12:00:00.000+09:00")
         self.assertEqual(changed_calls[1][2]["params"]["moreSequence"], final_id)
         detail_calls = [call for call in http.calls if call[1].endswith("/product-orders/query")]
