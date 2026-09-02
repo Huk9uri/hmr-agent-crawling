@@ -21,6 +21,7 @@ BASE_URL = "https://api.commerce.naver.com/external"
 TOKEN_URL = f"{BASE_URL}/v1/oauth2/token"
 CHANGED_ORDERS_URL = f"{BASE_URL}/v1/pay-order/seller/product-orders/last-changed-statuses"
 DETAILS_URL = f"{BASE_URL}/v1/pay-order/seller/product-orders/query"
+CONDITION_ORDERS_URL = f"{BASE_URL}/v1/pay-order/seller/product-orders"
 MAX_DETAIL_IDS = 300
 
 
@@ -79,6 +80,52 @@ class NaverAdapter(ChannelAdapter):
             payload = parse_json(response)
             for detail in payload.get("data", []):
                 yield _map_record(detail)
+
+    def fetch_backfill(self, window: DateWindow) -> Iterator[ChannelRecord]:
+        """Collect one ordered-date day, following every page and removing duplicate IDs."""
+        if window.start != window.end:
+            raise ValueError("Naver backfill windows must contain exactly 1 day")
+
+        token = self._access_token()
+        headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
+        next_day = window.start + timedelta(days=1)
+        page = 1
+        records_by_id: dict[str, ChannelRecord] = {}
+        while True:
+            response = self._http.request(
+                "GET",
+                CONDITION_ORDERS_URL,
+                headers=headers,
+                params={
+                    "from": f"{window.start.isoformat()}T00:00:00.000+09:00",
+                    "to": f"{next_day.isoformat()}T00:00:00.000+09:00",
+                    "rangeType": "ORDERED_DATETIME",
+                    "pageSize": 300,
+                    "page": page,
+                    "quantityClaimCompatibility": True,
+                },
+            )
+            self._record_page()
+            payload = parse_json(response)
+            data = payload.get("data") or {}
+            contents = data.get("contents") or []
+            if not isinstance(contents, list) or any(
+                not isinstance(item, dict) for item in contents
+            ):
+                raise ValueError("Naver condition-order response was malformed")
+            for item in contents:
+                detail = item.get("content")
+                if not isinstance(detail, dict):
+                    raise ValueError("Naver condition-order content was malformed")
+                record = _map_record(detail)
+                records_by_id[str(record.identity[0])] = record
+            pagination = data.get("pagination") or {}
+            if not isinstance(pagination, dict):
+                raise ValueError("Naver condition-order pagination was malformed")
+            if not pagination.get("hasNext", False):
+                break
+            page += 1
+        yield from records_by_id.values()
 
     def _access_token(self) -> str:
         timestamp_ms = self._clock_ms()

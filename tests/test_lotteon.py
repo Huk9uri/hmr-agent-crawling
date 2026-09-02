@@ -38,6 +38,50 @@ def config():
 
 
 class LotteonAdapterTests(unittest.TestCase):
+    def test_backfill_unions_new_and_completed_orders_then_joins_progress(self):
+        http = FakeHttpClient(
+            {
+                DELIVERY_ORDERS_URL: "lotteon_delivery_orders.json",
+                DELIVERY_PROGRESS_URL: "lotteon_delivery_progress.json",
+            }
+        )
+        adapter = LotteonAdapter(config(), http=http)
+
+        records = list(
+            adapter.fetch_backfill(DateWindow(date(2026, 8, 10), date(2026, 8, 10)))
+        )
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].identity, ("LOTTE-ORDER-001", "3"))
+        self.assertEqual(
+            [call[0:2] for call in http.calls],
+            [
+                ("POST", DELIVERY_ORDERS_URL),
+                ("POST", DELIVERY_ORDERS_URL),
+                ("POST", DELIVERY_PROGRESS_URL),
+            ],
+        )
+        self.assertEqual(
+            [call[2]["json"] for call in http.calls],
+            [
+                {
+                    "srchStrtDt": "20260810000000",
+                    "srchEndDt": "20260810235959",
+                    "ifCplYN": "N",
+                },
+                {
+                    "srchStrtDt": "20260810000000",
+                    "srchEndDt": "20260810235959",
+                    "ifCplYN": "Y",
+                },
+                {
+                    "srchStrtDt": "20260810000000",
+                    "srchEndDt": "20260810235959",
+                },
+            ],
+        )
+        self.assertEqual(adapter.pages_fetched, 3)
+
     def test_explicit_invalid_period_response_raises_typed_probe_signal(self):
         adapter = LotteonAdapter(
             config(),

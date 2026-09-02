@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from io import StringIO
 import json
 from types import MappingProxyType
@@ -11,6 +11,7 @@ import unittest
 from hmr_order_collection.channels.base import ChannelAdapter, DateWindow, InvalidPeriodError
 from hmr_order_collection.config import AppConfig, ConfigurationError
 from hmr_order_collection.database import WriteSummary
+from hmr_order_collection.models import ChannelRecord
 
 
 class FakeAdapter(ChannelAdapter):
@@ -27,6 +28,28 @@ class FakeAdapter(ChannelAdapter):
         if self.error is not None:
             raise self.error
         return iter([object()] * self.record_count)
+
+
+class BackfillAdapter(FakeAdapter):
+    def __init__(self, channel):
+        super().__init__()
+        self.channel = channel
+        self.backfill_windows = []
+
+    def fetch_backfill(self, window):
+        self.backfill_windows.append(window)
+        self._record_page()
+        identity = ("SHARED-PRODUCT-ORDER",)
+        return iter(
+            [
+                ChannelRecord(
+                    identity,
+                    {},
+                    "{}",
+                    bytes([window.start.day]) * 32,
+                )
+            ]
+        )
 
 
 class BoundaryAdapter(FakeAdapter):
@@ -178,6 +201,72 @@ class CliTests(unittest.TestCase):
             ("release", "HMR_ORDER_COLLECTION:naver"),
         ])
         self.assertTrue(connection.closed)
+
+    def test_manual_backfill_uses_thirty_completed_days_and_deduplicates_identity(self):
+        adapter = BackfillAdapter("naver")
+
+        code, output, error, calls, writer, connection = self.invoke(
+            [
+                "backfill",
+                "--channel",
+                "naver",
+                "--cutoff",
+                "2026-08-10",
+                "--days",
+                "30",
+                "--write-db",
+            ],
+            adapters={"naver": adapter},
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(error, "")
+        self.assertEqual(
+            adapter.backfill_windows,
+            [
+                DateWindow(date(2026, 7, 11) + timedelta(days=offset), date(2026, 7, 11) + timedelta(days=offset))
+                for offset in range(30)
+            ],
+        )
+        self.assertEqual(output["channels"][0]["windows"], 30)
+        self.assertEqual(output["channels"][0]["records"], 1)
+        self.assertEqual(output["channels"][0]["duplicates"], 29)
+        self.assertEqual(len(writer.calls), 1)
+        self.assertEqual(len(writer.calls[0][1]), 1)
+        self.assertEqual(calls["connection"], 1)
+        self.assertTrue(connection.closed)
+
+    def test_manual_backfill_supports_only_naver_and_lotteon_and_at_most_thirty_days(self):
+        cases = (
+            ["backfill", "--channel", "coupang", "--cutoff", "2026-08-10"],
+            ["backfill", "--channel", "naver", "--cutoff", "2026-08-10", "--days", "0"],
+            ["backfill", "--channel", "lotteon", "--cutoff", "2026-08-10", "--days", "31"],
+        )
+        for argv in cases:
+            with self.subTest(argv=argv):
+                code, output, error, calls, _writer, _connection = self.invoke(argv)
+
+                self.assertEqual(code, 2)
+                self.assertIsNone(output)
+                self.assertEqual(error, "error: invalid backfill arguments\n")
+                self.assertEqual(calls, {"config": 0, "registry": 0, "connection": 0})
+
+    def test_manual_backfill_api_failure_returns_safe_count_only_result(self):
+        adapter = BackfillAdapter("naver")
+        adapter.fetch_backfill = lambda _window: (_ for _ in ()).throw(
+            RuntimeError("secret API response")
+        )
+
+        code, output, error, _calls, _writer, _connection = self.invoke(
+            ["backfill", "--channel", "naver", "--cutoff", "2026-08-10"],
+            adapters={"naver": adapter},
+        )
+
+        self.assertEqual(code, 1)
+        self.assertEqual(error, "")
+        self.assertEqual(output["status"], "failed")
+        self.assertEqual(output["channels"][0]["error_type"], "RuntimeError")
+        self.assertNotIn("secret API response", json.dumps(output))
 
     def test_write_mode_releases_lock_when_writer_fails(self):
         events = []

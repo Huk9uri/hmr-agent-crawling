@@ -62,6 +62,17 @@ def _parser() -> argparse.ArgumentParser:
     collect_all.add_argument(
         "--verified-maximum-days", action="append", default=[], metavar="CHANNEL=DAYS"
     )
+
+    backfill = commands.add_parser(
+        "backfill", help="manually backfill Naver or LotteON completed days"
+    )
+    backfill.add_argument("--channel", required=True)
+    backfill.add_argument("--cutoff", required=True)
+    backfill.add_argument("--days", type=int, default=30)
+    backfill.add_argument("--config", type=Path, default=Path(".env"))
+    mode = backfill.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true")
+    mode.add_argument("--write-db", action="store_true")
     return parser
 
 
@@ -150,6 +161,26 @@ def _fetch_windows(
     return records
 
 
+def _fetch_backfill_windows(
+    adapter: ChannelAdapter,
+    windows: Iterable[DateWindow],
+    summary: dict[str, Any],
+) -> list[Any]:
+    records_by_identity: dict[tuple[Any, ...], Any] = {}
+    received = 0
+    fetch_backfill = getattr(adapter, "fetch_backfill")
+    for window in windows:
+        window_records = list(fetch_backfill(window))
+        received += len(window_records)
+        for record in window_records:
+            records_by_identity[tuple(record.identity)] = record
+        summary["windows"] += 1
+    records = list(records_by_identity.values())
+    summary["records"] = len(records)
+    summary["duplicates"] = received - len(records)
+    return records
+
+
 def _probe_boundary(
     channel: str,
     adapter: ChannelAdapter,
@@ -207,6 +238,32 @@ def _execute_channel(
     return summary
 
 
+def _execute_backfill(
+    channel: str,
+    adapter: ChannelAdapter,
+    windows: Iterable[DateWindow],
+    writer: DatabaseWriter | None,
+) -> dict[str, Any]:
+    summary = _empty_summary(channel)
+    summary["duplicates"] = 0
+    starting_pages = adapter.pages_fetched
+    try:
+        records = _fetch_backfill_windows(adapter, windows, summary)
+        if writer is not None:
+            written = writer.write(channel, records, uuid4())
+            summary.update(
+                inserted=written.inserted,
+                changed=written.changed,
+                skipped=written.skipped,
+            )
+    except Exception as error:
+        summary.update(status="failed", error_type=type(error).__name__)
+        raise ChannelRunFailure(summary) from None
+    finally:
+        summary["pages"] = adapter.pages_fetched - starting_pages
+    return summary
+
+
 def _render(payload: Mapping[str, Any], stream: TextIO) -> None:
     json.dump(payload, stream, ensure_ascii=False, separators=(",", ":"))
     stream.write("\n")
@@ -236,9 +293,18 @@ def main(
         if args.command == "collect" and args.channel not in CHANNEL_NAMES:
             raise CliUsageError("unknown channel")
 
-        end = _parse_date(args.end)
-        start = _parse_date(args.start) if args.command == "collect" else None
-        _validate_dates(start or end, end, today or date.today())
+        if args.command == "backfill":
+            if args.channel not in {"naver", "lotteon"} or not 1 <= args.days <= 30:
+                raise CliUsageError("invalid backfill arguments")
+            cutoff = _parse_date(args.cutoff)
+            if cutoff > (today or date.today()):
+                raise CliUsageError("invalid backfill arguments")
+            start = cutoff - timedelta(days=args.days)
+            end = cutoff - timedelta(days=1)
+        else:
+            end = _parse_date(args.end)
+            start = _parse_date(args.start) if args.command == "collect" else None
+            _validate_dates(start or end, end, today or date.today())
         if getattr(args, "probe_boundaries", False) and args.write_db:
             raise CliUsageError("boundary probing is dry-run only")
         verified_maximum_days = _parse_verified_maximum_days(
@@ -257,7 +323,7 @@ def main(
         stderr.write("error: invalid or incomplete configuration\n")
         return 2
 
-    if args.command == "collect":
+    if args.command in {"collect", "backfill"}:
         channels = (args.channel,)
     else:
         channels = tuple(adapters)
@@ -289,33 +355,39 @@ def main(
                         summary = _empty_summary(channel)
                         summary.update(status="failed", error_type=ChannelLockError.__name__)
                         raise ChannelRunFailure(summary)
-                windows = _windows_for_channel(
-                    channel,
-                    start=start,
-                    end=end,
-                    maximum_window=args.command == "collect-all",
-                    verified_maximum_days=verified_maximum_days.get(channel),
-                )
-                channel_summaries.append(
-                    _execute_channel(
-                        channel,
-                        adapters[channel],
-                        windows,
-                        writer,
-                        probe_boundary=(
-                            getattr(args, "probe_boundaries", False)
-                            and channel in BOUNDARY_PROBE_START_DAYS
-                        ),
-                        end=end,
-                        applied_verified_maximum_days=verified_maximum_days.get(
-                            channel
-                        ),
+                if args.command == "backfill":
+                    windows = iter_windows(start, end, 1)
+                    channel_summaries.append(
+                        _execute_backfill(channel, adapters[channel], windows, writer)
                     )
-                )
+                else:
+                    windows = _windows_for_channel(
+                        channel,
+                        start=start,
+                        end=end,
+                        maximum_window=args.command == "collect-all",
+                        verified_maximum_days=verified_maximum_days.get(channel),
+                    )
+                    channel_summaries.append(
+                        _execute_channel(
+                            channel,
+                            adapters[channel],
+                            windows,
+                            writer,
+                            probe_boundary=(
+                                getattr(args, "probe_boundaries", False)
+                                and channel in BOUNDARY_PROBE_START_DAYS
+                            ),
+                            end=end,
+                            applied_verified_maximum_days=verified_maximum_days.get(
+                                channel
+                            ),
+                        )
+                    )
             except ChannelRunFailure as error:
                 failure_count += 1
                 channel_summaries.append(error.summary)
-                if not args.continue_on_error:
+                if not getattr(args, "continue_on_error", False):
                     break
             finally:
                 if acquired:

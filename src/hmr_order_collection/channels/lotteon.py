@@ -79,6 +79,49 @@ class LotteonAdapter(ChannelAdapter):
         for order in orders:
             yield _map_record(order, progress_by_identity.get(_identity(order)))
 
+    def fetch_backfill(self, window: DateWindow) -> Iterator[ChannelRecord]:
+        """Collect one historical day including new and integration-complete orders."""
+        if window.start != window.end:
+            raise ValueError("LotteON backfill windows must contain exactly 1 day")
+        base_body = {
+            "srchStrtDt": f"{window.start:%Y%m%d}000000",
+            "srchEndDt": f"{window.end:%Y%m%d}235959",
+        }
+        headers = {
+            "Accept": "application/json",
+            "Accept-Language": "ko",
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+            "X-Timezone": "GMT+09:00",
+        }
+        orders_by_identity: dict[tuple[str, str], dict[str, Any]] = {}
+        for completion in ("N", "Y"):
+            rows = self._list(
+                DELIVERY_ORDERS_URL,
+                {**base_body, "ifCplYN": completion},
+                headers,
+                "deliveryOrderList",
+            )
+            for order in rows:
+                orders_by_identity[_identity(order)] = order
+
+        progress_rows = self._list(
+            DELIVERY_PROGRESS_URL,
+            base_body,
+            headers,
+            "deliveryProgressStateList",
+        )
+        progress_by_identity: dict[tuple[str, str], dict[str, Any]] = {}
+        for progress in progress_rows:
+            identity = _identity(progress)
+            previous = progress_by_identity.get(identity)
+            if previous is None or str(progress.get("dvTrcStatDttm") or "") >= str(
+                previous.get("dvTrcStatDttm") or ""
+            ):
+                progress_by_identity[identity] = progress
+        for identity, order in orders_by_identity.items():
+            yield _map_record(order, progress_by_identity.get(identity))
+
     def _list(
         self,
         url: str,

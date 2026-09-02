@@ -27,6 +27,29 @@ $env:PYTHONPATH='C:\HMR_Agent_Crawling\src'
 
 The output contains status and counts only. Exit code `0` means all channels succeeded. Exit code `1` means partial or total channel failure. Exit code `2` means initialization failure or an overlapping run.
 
+## One-time Naver and LotteON backfill
+
+The daily scheduler remains an incremental collector. Run the following manual commands once when the recent 30 completed days must be initialized or repaired. `--cutoff 2026-09-02` means the 30 daily windows ending immediately before `2026-09-02 00:00:00 KST`; the covered calendar dates are 2026-08-03 through 2026-09-01.
+
+Validate through read-only API calls first:
+
+```powershell
+$env:PYTHONPATH='C:\HMR_Agent_Crawling\src'
+& 'C:\HMR_Agent_Crawling\.venv\Scripts\python.exe' `
+  -m hmr_order_collection.cli backfill `
+  --channel naver --cutoff 2026-09-02 --days 30 --dry-run `
+  --config 'C:\HMR_Agent_Crawling\.env'
+
+& 'C:\HMR_Agent_Crawling\.venv\Scripts\python.exe' `
+  -m hmr_order_collection.cli backfill `
+  --channel lotteon --cutoff 2026-09-02 --days 30 --dry-run `
+  --config 'C:\HMR_Agent_Crawling\.env'
+```
+
+After both results have `status: ok`, repeat each command with `--write-db` instead of `--dry-run`. Write mode acquires the existing per-channel application lock. Naver follows `pagination.hasNext` and uses `ORDERED_DATETIME`; LotteON calls the deployed read-only order search for both `ifCplYN=N` and `ifCplYN=Y`, unions the results, and joins the read-only delivery-progress search. Both channels collect one calendar day per API window and deduplicate all returned records by the deployed order-item identity before one database write. Repeating a completed backfill is safe: the database payload hash comparison skips unchanged records.
+
+The command does not create a persistent completion flag. Record the successful write result in the deployment log and do not add this command to Windows Task Scheduler. The existing 14:00 task continues to run incremental collection only.
+
 ## Validate and register the 14:00 task
 
 Run validation first; it never changes Task Scheduler:

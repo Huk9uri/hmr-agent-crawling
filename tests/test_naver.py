@@ -7,7 +7,11 @@ import unittest
 import requests
 
 from hmr_order_collection.channels.base import DateWindow
-from hmr_order_collection.channels.naver import NaverAdapter, generate_client_secret_sign
+from hmr_order_collection.channels.naver import (
+    CONDITION_ORDERS_URL,
+    NaverAdapter,
+    generate_client_secret_sign,
+)
 from hmr_order_collection.config import AppConfig
 from hmr_order_collection.database import TABLES
 
@@ -49,6 +53,68 @@ def config():
 
 
 class NaverAdapterTests(unittest.TestCase):
+    def test_backfill_pages_ordered_datetime_and_deduplicates_product_order_id(self):
+        def detail(product_order_id):
+            return {
+                "productOrderId": product_order_id,
+                "content": {
+                    "order": {"orderId": f"ORDER-{product_order_id}"},
+                    "productOrder": {"productOrderId": product_order_id},
+                    "delivery": {},
+                },
+            }
+
+        def handler(method, url, kwargs):
+            if url.endswith("/oauth2/token"):
+                return {"access_token": "SYNTHETIC_ACCESS_TOKEN"}
+            page = kwargs["params"]["page"]
+            return {
+                "data": {
+                    "contents": (
+                        [detail("PRODUCT-ORDER-001"), detail("PRODUCT-ORDER-002")]
+                        if page == 1
+                        else [detail("PRODUCT-ORDER-002"), detail("PRODUCT-ORDER-003")]
+                    ),
+                    "pagination": {"page": page, "size": 2, "hasNext": page == 1},
+                }
+            }
+
+        http = FakeHttpClient(handler)
+        adapter = NaverAdapter(config(), http=http, clock_ms=lambda: 1643961623299)
+
+        records = list(
+            adapter.fetch_backfill(DateWindow(date(2026, 8, 2), date(2026, 8, 2)))
+        )
+
+        condition_calls = [call for call in http.calls if call[1] == CONDITION_ORDERS_URL]
+        self.assertEqual([record.identity for record in records], [
+            ("PRODUCT-ORDER-001",),
+            ("PRODUCT-ORDER-002",),
+            ("PRODUCT-ORDER-003",),
+        ])
+        self.assertEqual(
+            [call[2]["params"] for call in condition_calls],
+            [
+                {
+                    "from": "2026-08-02T00:00:00.000+09:00",
+                    "to": "2026-08-03T00:00:00.000+09:00",
+                    "rangeType": "ORDERED_DATETIME",
+                    "pageSize": 300,
+                    "page": 1,
+                    "quantityClaimCompatibility": True,
+                },
+                {
+                    "from": "2026-08-02T00:00:00.000+09:00",
+                    "to": "2026-08-03T00:00:00.000+09:00",
+                    "rangeType": "ORDERED_DATETIME",
+                    "pageSize": 300,
+                    "page": 2,
+                    "quantityClaimCompatibility": True,
+                },
+            ],
+        )
+        self.assertEqual(adapter.pages_fetched, 2)
+
     def test_fetch_splits_daily_window_into_2350_and_20_minute_requests(self):
         def handler(method, url, kwargs):
             if url.endswith("/oauth2/token"):
