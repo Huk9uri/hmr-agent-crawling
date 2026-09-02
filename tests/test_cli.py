@@ -472,9 +472,9 @@ class CliTests(unittest.TestCase):
         expected_starts = {
             "naver": date(2026, 8, 10),
             "coupang": date(2026, 7, 11),
-            "godomall": date(2026, 8, 10),
+            "godomall": date(2026, 7, 11),
             "lotteon": date(2026, 8, 10),
-            "elevenst": date(2026, 8, 10),
+            "elevenst": date(2026, 7, 11),
             "ssg": date(2026, 2, 12),
             "cj_onstyle": date(2026, 7, 11),
             "toss": date(2026, 7, 11),
@@ -612,7 +612,7 @@ class CliTests(unittest.TestCase):
     def test_verified_maximum_days_accepts_repeatable_reviewed_channel_values(self):
         adapters = {
             "godomall": BoundaryAdapter(maximum_accepted_days=31),
-            "elevenst": BoundaryAdapter(maximum_accepted_days=7),
+            "elevenst": BoundaryAdapter(maximum_accepted_days=31),
         }
         code, output, error, _calls, _writer, _connection = self.invoke(
             [
@@ -623,7 +623,7 @@ class CliTests(unittest.TestCase):
                 "--verified-maximum-days",
                 "godomall=31",
                 "--verified-maximum-days",
-                "elevenst=7",
+                "elevenst=31",
             ],
             adapters=adapters,
         )
@@ -632,7 +632,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(error, "")
         self.assertEqual(
             [item["applied_verified_maximum_days"] for item in output["channels"]],
-            [31, 7],
+            [31, 31],
         )
 
     def test_verified_maximum_days_rejects_unknown_fixed_duplicate_and_invalid_values(self):
@@ -641,7 +641,7 @@ class CliTests(unittest.TestCase):
             ["--verified-maximum-days", "lotteon=1"],
             ["--verified-maximum-days", "godomall=0"],
             ["--verified-maximum-days", "godomall=32"],
-            ["--verified-maximum-days", "elevenst=8"],
+            ["--verified-maximum-days", "elevenst=32"],
             ["--verified-maximum-days", "godomall=not-an-integer"],
             [
                 "--verified-maximum-days",

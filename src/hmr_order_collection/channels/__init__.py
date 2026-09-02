@@ -26,13 +26,13 @@ CHANNEL_NAMES = (
 )
 
 # Inclusive limits used for splitting requests and the initial maximum-window run.
-# Conservative one-day values remain in force where the live boundary probe is deferred.
+# Values reflect authenticated read-only boundary verification.
 MAXIMUM_WINDOW_DAYS = {
     "naver": 1,
     "coupang": 31,
-    "godomall": 1,
+    "godomall": 31,
     "lotteon": 1,
-    "elevenst": 1,
+    "elevenst": 31,
     "ssg": 180,
     "cj_onstyle": 31,
     "toss": 31,
@@ -43,7 +43,7 @@ MAXIMUM_WINDOW_DAYS = {
 BOUNDARY_PROBE_START_DAYS = {
     "godomall": 31,
     "lotteon": 1,
-    "elevenst": 7,
+    "elevenst": 31,
 }
 
 
