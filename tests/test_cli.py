@@ -268,6 +268,24 @@ class CliTests(unittest.TestCase):
         self.assertEqual(output["channels"][0]["error_type"], "RuntimeError")
         self.assertNotIn("secret API response", json.dumps(output))
 
+    def test_manual_backfill_rejects_cutoff_that_cannot_cover_requested_days(self):
+        code, output, error, calls, _writer, _connection = self.invoke(
+            [
+                "backfill",
+                "--channel",
+                "naver",
+                "--cutoff",
+                "0001-01-01",
+                "--days",
+                "30",
+            ]
+        )
+
+        self.assertEqual(code, 2)
+        self.assertIsNone(output)
+        self.assertEqual(error, "error: invalid backfill arguments\n")
+        self.assertEqual(calls, {"config": 0, "registry": 0, "connection": 0})
+
     def test_write_mode_releases_lock_when_writer_fails(self):
         events = []
 

@@ -107,8 +107,12 @@ class NaverAdapter(ChannelAdapter):
             )
             self._record_page()
             payload = parse_json(response)
-            data = payload.get("data") or {}
-            contents = data.get("contents") or []
+            if not isinstance(payload, dict) or not isinstance(
+                payload.get("data"), dict
+            ):
+                raise ValueError("Naver condition-order data was malformed")
+            data = payload["data"]
+            contents = data.get("contents")
             if not isinstance(contents, list) or any(
                 not isinstance(item, dict) for item in contents
             ):
@@ -119,10 +123,12 @@ class NaverAdapter(ChannelAdapter):
                     raise ValueError("Naver condition-order content was malformed")
                 record = _map_record(detail)
                 records_by_id[str(record.identity[0])] = record
-            pagination = data.get("pagination") or {}
-            if not isinstance(pagination, dict):
+            pagination = data.get("pagination")
+            if not isinstance(pagination, dict) or not isinstance(
+                pagination.get("hasNext"), bool
+            ):
                 raise ValueError("Naver condition-order pagination was malformed")
-            if not pagination.get("hasNext", False):
+            if not pagination["hasNext"]:
                 break
             page += 1
         yield from records_by_id.values()

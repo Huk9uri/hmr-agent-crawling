@@ -115,6 +115,33 @@ class NaverAdapterTests(unittest.TestCase):
         )
         self.assertEqual(adapter.pages_fetched, 2)
 
+    def test_backfill_rejects_incomplete_success_payload_instead_of_silently_stopping(self):
+        malformed_payloads = (
+            {},
+            {"data": {}},
+            {"data": {"contents": [], "pagination": {}}},
+            {"data": {"contents": [], "pagination": {"hasNext": "false"}}},
+        )
+        for malformed in malformed_payloads:
+            with self.subTest(payload=malformed):
+                def handler(method, url, kwargs):
+                    if url.endswith("/oauth2/token"):
+                        return {"access_token": "SYNTHETIC_ACCESS_TOKEN"}
+                    return malformed
+
+                adapter = NaverAdapter(
+                    config(),
+                    http=FakeHttpClient(handler),
+                    clock_ms=lambda: 1643961623299,
+                )
+
+                with self.assertRaisesRegex(ValueError, "condition-order"):
+                    list(
+                        adapter.fetch_backfill(
+                            DateWindow(date(2026, 8, 2), date(2026, 8, 2))
+                        )
+                    )
+
     def test_fetch_splits_daily_window_into_2350_and_20_minute_requests(self):
         def handler(method, url, kwargs):
             if url.endswith("/oauth2/token"):

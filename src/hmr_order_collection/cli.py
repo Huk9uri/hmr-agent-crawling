@@ -299,8 +299,11 @@ def main(
             cutoff = _parse_date(args.cutoff)
             if cutoff > (today or date.today()):
                 raise CliUsageError("invalid backfill arguments")
-            start = cutoff - timedelta(days=args.days)
-            end = cutoff - timedelta(days=1)
+            try:
+                start = cutoff - timedelta(days=args.days)
+                end = cutoff - timedelta(days=1)
+            except OverflowError as error:
+                raise CliUsageError("invalid backfill arguments") from error
         else:
             end = _parse_date(args.end)
             start = _parse_date(args.start) if args.command == "collect" else None
