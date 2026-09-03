@@ -129,6 +129,25 @@ class LotteonAdapterTests(unittest.TestCase):
         self.assertNotIn("SYNTHETIC_NAME_TO_MASK", record.raw_json)
         self.assertNotIn("SYNTHETIC_ORDERER_TO_MASK", record.raw_json)
 
+    def test_normalizes_compact_lotteon_datetimes_for_sql_server(self):
+        http = FakeHttpClient(
+            {
+                DELIVERY_ORDERS_URL: "lotteon_delivery_orders.json",
+                DELIVERY_PROGRESS_URL: "lotteon_delivery_progress.json",
+            }
+        )
+
+        record = next(
+            LotteonAdapter(config(), http=http).fetch(
+                DateWindow(date(2026, 8, 10), date(2026, 8, 10))
+            )
+        )
+
+        self.assertEqual(record.columns["OrderedAt"], "2026-08-10T10:00:00")
+        self.assertIsNone(record.columns["PaidAt"])
+        self.assertEqual(record.columns["DispatchedAt"], "2026-08-10T13:00:00")
+        self.assertEqual(record.columns["DeliveryCompletedAt"], "2026-08-10T18:30:00")
+
     def test_fetch_rejects_null_or_blank_order_and_item_identity_components(self):
         malformed_rows = (
             {"odNo": None, "odSeq": "1"},

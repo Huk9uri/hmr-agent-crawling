@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -185,10 +186,16 @@ def _map_record(order: dict[str, Any], progress: dict[str, Any] | None) -> Chann
         "PaymentAmount": _decimal(order.get("actualAmt")),
         "OrderStatus": order_status,
         "DeliveryStatus": delivery_status,
-        "OrderedAt": order.get("odCmptDttm"),
-        "PaidAt": order.get("payDttm"),
-        "DispatchedAt": progress.get("owhoDttm") or order.get("owhoDttm"),
-        "DeliveryCompletedAt": progress_time if delivery_status in {"14", "15"} else None,
+        "OrderedAt": _optional_datetime(order.get("odCmptDttm")),
+        "PaidAt": _optional_datetime(order.get("payDttm")),
+        "DispatchedAt": _optional_datetime(
+            progress.get("owhoDttm") or order.get("owhoDttm")
+        ),
+        "DeliveryCompletedAt": (
+            _optional_datetime(progress_time)
+            if delivery_status in {"14", "15"}
+            else None
+        ),
         "DeliveryCompanyCode": _optional_str(progress.get("dvCoCd") or order.get("dvCoCd")),
         "TrackingNumber": _optional_str(progress.get("invcNo") or order.get("invcNo")),
         "RawOrderStatus": order_status,
@@ -213,6 +220,21 @@ def _mask_private_fields(value: Any) -> Any:
 
 def _optional_str(value: Any) -> str | None:
     return None if value is None or value == "" else str(value)
+
+
+def _optional_datetime(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text, "%Y%m%d%H%M%S").isoformat()
+    except ValueError:
+        try:
+            return datetime.fromisoformat(text).isoformat()
+        except ValueError as error:
+            raise ValueError("LotteON datetime field was invalid") from error
 
 
 def _integer(value: Any) -> int | None:
