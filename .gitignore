@@ -10,7 +10,10 @@ token-cache/
 token_cache/
 *.token-cache.json
 .uv-cache/
+.venv/
+.pytest_cache/
 collector-output/
 *.response-body
+*.zip
 __pycache__/
 *.py[cod]
