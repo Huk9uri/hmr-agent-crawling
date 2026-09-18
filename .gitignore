@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.worktrees/
+.profiles/
+.tmp/
+.tmp_channel_check/
+tmp/
+node_modules/
+__pycache__/
+*.py[cod]
+*.xlsx
