@@ -41,14 +41,10 @@ sql/channel_orders/060_verify_history_constraints.sql
 sql/channel_orders/090_verify_channel_order_tables.sql
 ```
 
-## Collector CLI
+## 수집기 CLI
 
-Use Python 3.12 and install the fully resolved, hash-locked runtime from
-`requirements.lock`. `requirements.txt` contains only the direct dependency
-inputs used to regenerate that lock.
-Configuration is loaded strictly from `.env` (or the file passed with
-`--config`). Use `.env.example` as the key-only template; API and database
-credentials are never accepted as command-line arguments.
+Python 3.12를 사용하고, 전체 의존성과 해시가 고정된 `requirements.lock`으로 실행 환경을 설치합니다. `requirements.txt`에는 잠금 파일을 다시 생성하는 데 사용하는 직접 의존성만 포함되어 있습니다.
+설정은 `.env` 또는 `--config`로 지정한 파일에서만 읽습니다. `.env.example`을 설정 키 템플릿으로 사용하며, API 및 DB 인증 정보는 명령행 인자로 받지 않습니다.
 
 ```powershell
 python -m pip install --require-hashes -r requirements.lock
@@ -60,60 +56,35 @@ python -m hmr_order_collection.cli collect-all --to 2026-08-10 --maximum-window 
 python -m hmr_order_collection.cli collect-all --to 2026-08-10 --maximum-window --verified-maximum-days godomall=28 --verified-maximum-days elevenst=7 --write-db --continue-on-error
 ```
 
-Regenerate the lock only as an intentional dependency update:
+의존성을 명시적으로 갱신할 때만 잠금 파일을 다시 생성합니다:
 
 ```powershell
 uv pip compile requirements.txt --python-version 3.12 --generate-hashes --output-file requirements.lock
 ```
 
-Collection is a dry run by default. Database persistence is enabled only by
-the explicit `--write-db` flag. The CLI emits one JSON summary containing
-channel names, status, window/page/record/write counts, and safe probe counts;
-it never emits order records, exception
-messages, response bodies, PII, API credentials, or database credentials.
-Use `--continue-on-error` to attempt later channels after a channel failure.
-The process still exits nonzero when any channel fails.
+수집은 기본적으로 dry-run으로 실행하며, `--write-db`를 명시한 경우에만 DB에 저장합니다. CLI는 채널명, 상태, 조회 구간·페이지·레코드·저장 건수, 안전한 경계 탐색 건수만 포함한 JSON 요약을 출력합니다. 주문 레코드, 예외 메시지, 응답 본문, 개인정보, API 및 DB 인증 정보는 출력하지 않습니다.
+`--continue-on-error`를 지정하면 채널 실패 후에도 다음 채널을 시도합니다. 하나라도 실패하면 프로세스는 0이 아닌 종료 코드를 반환합니다.
 
-Write mode uses the same SQL Server application lock as the daily
-orchestrator: `HMR_ORDER_COLLECTION:{channel}`. The lock covers API collection
-and the channel's write transaction and is released immediately afterward.
-The automatic orchestrator uses an independent connection and transaction per
-channel, runs up to `ORCHESTRATOR_MAX_WORKERS=4` attempts concurrently, and
-does not retain a worker or channel lock while a retry is waiting. Set the
-value to `1` for an emergency sequential fallback.
+저장 모드는 정기 오케스트레이터와 동일한 SQL Server 애플리케이션 잠금 `HMR_ORDER_COLLECTION:{channel}`을 사용합니다. 잠금은 API 수집부터 해당 채널의 저장 트랜잭션까지 유지하고 즉시 해제합니다.
+자동 오케스트레이터는 채널별로 독립 연결과 트랜잭션을 사용하고, `ORCHESTRATOR_MAX_WORKERS=4`를 기준으로 최대 4개 시도를 동시에 실행합니다. 재시도 대기 중에는 작업 스레드나 채널 잠금을 유지하지 않습니다. 비상 시 값을 `1`로 설정하여 순차 실행으로 전환할 수 있습니다.
 
-The initial maximum-window policy always ends on the explicit `--to` date:
+초기 최대 조회 기간의 종료일은 항상 명시한 `--to` 날짜입니다:
 
-| Channel | Inclusive days | Current basis |
+| 채널 | 시작일·종료일 포함 일수 | 당시 적용 근거 |
 |---|---:|---|
-| Naver SmartStore | 1 | changed-order endpoint limit |
-| Coupang | 31 | order-sheet endpoint limit |
-| Godomall | 1 | conservative pre-live boundary |
-| LotteON | 1 | adapter/API search limit |
-| 11st | 1 | conservative pre-live boundary |
-| SSG.COM | 180 | shipping-direction endpoint limit |
-| Toss Shopping | 31 | order endpoint limit |
+| 네이버 스마트스토어 | 1 | 변경 주문 엔드포인트 제한 |
+| 쿠팡 | 31 | 발주서 엔드포인트 제한 |
+| 고도몰 | 1 | 실연동 전 보수적으로 설정한 경계 |
+| 롯데ON | 1 | 어댑터/API 검색 제한 |
+| 11번가 | 1 | 실연동 전 보수적으로 설정한 경계 |
+| SSG.COM | 180 | 배송 지시 엔드포인트 제한 |
+| 토스쇼핑 | 31 | 주문 엔드포인트 제한 |
 
-Godomall and 11st remain at a conservative one-day range until the controller
-performs the planned authenticated, read-only boundary checks after independent
-code review. Do not widen either range based only on HTTP status.
+고도몰과 11번가는 독립 코드 검토 후 제어 담당자가 인증된 읽기 전용 경계 검증을 수행하기 전까지 보수적인 1일 범위를 유지합니다. HTTP 상태만 보고 조회 범위를 넓히지 않습니다.
 
-`--probe-boundaries` is dry-run-only. It starts Godomall at 31 inclusive days,
-11st at 7, and LotteON at its official 1-day limit. A candidate is reduced by
-one day only when the adapter recognizes an explicit invalid-period business
-response; authentication, transport, parsing, and other business failures stop
-that channel without reduction. The JSON summary exposes `probe_attempts`,
-`probe_invalid_periods`, `verified_maximum_days`, and `pages` as count-only
-metadata. LotteON is never queried above one day.
+`--probe-boundaries`는 dry-run에서만 사용할 수 있습니다. 고도몰은 시작일·종료일을 포함한 31일, 11번가는 7일, 롯데ON은 공식 제한인 1일부터 시작합니다. 어댑터가 명시적인 조회 기간 오류 업무 응답을 인식한 경우에만 후보 기간을 하루 줄입니다. 인증, 통신, 파싱 및 다른 업무 오류는 기간을 줄이지 않고 해당 채널 실행을 중단합니다. JSON 요약은 `probe_attempts`, `probe_invalid_periods`, `verified_maximum_days`, `pages`를 건수 메타데이터로 제공합니다. 롯데ON은 1일을 초과하여 조회하지 않습니다.
 
-After reviewing a successful probe summary, pass each approved Godomall or 11st
-value to the later maximum-window command with repeatable
-`--verified-maximum-days channel=days` options. The write summary includes
-`applied_verified_maximum_days` for that channel. Godomall values must be 1-31
-and 11st values 1-7. LotteON is fixed at one day and cannot be overridden;
-unknown channels, duplicate entries, malformed integers, and out-of-range
-values fail before configuration is loaded. Never copy an unreviewed value from
-an unsuccessful or partial probe.
+성공한 경계 탐색 요약을 검토한 후, 승인된 고도몰 또는 11번가 값을 반복 가능한 `--verified-maximum-days channel=days` 옵션으로 후속 최대 기간 수집 명령에 전달합니다. 저장 요약에는 채널별 `applied_verified_maximum_days`가 포함됩니다. 고도몰은 1~31, 11번가는 1~7이어야 합니다. 롯데ON은 1일로 고정되어 재정의할 수 없습니다. 알 수 없는 채널, 중복 항목, 잘못된 정수 및 범위 밖 값은 설정 파일을 읽기 전에 실패합니다. 실패하거나 일부만 성공한 탐색에서 검토되지 않은 값을 복사하지 않습니다.
 
 생성 스크립트와 인덱스 스크립트는 두 번 실행해도 같은 객체를 중복 생성하지 않는다.
 

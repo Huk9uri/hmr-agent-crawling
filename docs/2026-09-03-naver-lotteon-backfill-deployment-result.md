@@ -106,7 +106,7 @@ $env:PYTHONPATH = Join-Path $resolvedRoot 'src'
   - `src/hmr_order_collection/channels/lotteon.py`
   - `tests/test_lotteon.py`
 - 배포 ZIP: `HMR_Agent_Crawling_3fe3717.zip`
-- ZIP SHA-256: `9C03F40928131246DB1CB24292CD65BE8A1DED4C7178E6031CB19DBA6C696C72`
+- ZIP 파일 SHA-256 해시: `9C03F40928131246DB1CB24292CD65BE8A1DED4C7178E6031CB19DBA6C696C72`
 - 서버 배포 경로: `C:\Users\Administrator\Desktop\iyeon_RPA\HMR_Agent_Crawling`
 
 배포 시 서버에 존재하는 `.env`와 `.venv`는 유지하고, ZIP의 커밋된 프로젝트 파일 111개를 기존 운영 폴더에 병합·덮어썼다. `robocopy` 결과 실패는 0건이었다.

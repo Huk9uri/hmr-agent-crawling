@@ -1,40 +1,40 @@
-# Channel Order Tables Implementation Plan
+# 채널 주문 테이블 구현 계획
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **에이전트 작업자 안내:** 필수 하위 스킬로 superpowers:subagent-driven-development(권장) 또는 superpowers:executing-plans를 사용하여 이 계획을 작업별로 구현합니다. 진행 상황은 체크박스(`- [ ]`)로 추적합니다.
 
-**Goal:** Create seven SQL Server `dbo` tables that store one row per channel order item while preserving status history, masked JSON, and efficient latest-row lookup.
+**목표:** 주문상품당 한 행을 저장하고 상태 이력, 마스킹 JSON 및 효율적인 최신 행 조회를 지원하는 SQL Server `dbo` 테이블 7개를 생성합니다.
 
-**Architecture:** Each verified sales channel owns one `dbo.*_ORDER_ITEM` table with channel-native business columns and a common set of collection metadata. Inserts are append-only; a filtered unique index guarantees at most one `IsLatest = 1` row per channel order-item identity. Separate SQL scripts create tables, create indexes, verify behavior, and remove only the objects introduced by this feature.
+**구조:** 검증된 판매 채널마다 채널 고유 업무 컬럼과 공통 수집 메타데이터를 갖춘 `dbo.*_ORDER_ITEM` 테이블을 하나씩 둡니다. 데이터는 이력 행 추가 방식으로 저장하며, 필터형 고유 인덱스로 주문상품 식별자당 `IsLatest = 1` 행을 최대 하나로 보장합니다. 테이블 생성, 인덱스 생성, 동작 검증 및 이 기능에서 추가한 객체만 제거하는 SQL을 각각 분리합니다.
 
-**Tech Stack:** Microsoft SQL Server 2017+ (SSMS), T-SQL, `datetime2(3)`, `nvarchar(max)` JSON with `ISJSON`, SHA-256 payload hashes in `binary(32)`.
+**기술 스택:** Microsoft SQL Server 2017+ 및 SSMS, T-SQL, `datetime2(3)`, `ISJSON`으로 검증하는 `nvarchar(max)` JSON, `binary(32)`의 SHA-256 페이로드 해시.
 
-## Global Constraints
+## 공통 제약 사항
 
-- Target database is `ecommerce`; scripts must refuse to run in `master`, `model`, `msdb`, or `tempdb`.
-- Use the existing `dbo` schema; do not create or reference an `stg` schema.
-- Table names use uppercase English snake case.
-- One row represents one order item; status changes append a new row instead of overwriting history.
-- Only masked JSON may be written to `RawJson`; API keys, secrets, and tokens must never be stored.
-- All database-generated timestamps use `SYSUTCDATETIME()` and `datetime2(3)`.
-- External identifiers use `nvarchar` unless the channel contract explicitly guarantees `int64`.
-- DDL scripts are idempotent and use `SET XACT_ABORT ON`.
-- No script may execute order confirmation, shipping, cancellation, or other external state-changing APIs.
+- 대상 DB는 `ecommerce`이며 `master`, `model`, `msdb`, `tempdb`에서는 실행을 거부합니다.
+- 기존 `dbo` 스키마를 사용하고 `stg` 스키마를 생성하거나 참조하지 않습니다.
+- 테이블명은 대문자 영문 스네이크 표기법을 사용합니다.
+- 한 행은 주문상품 하나를 나타냅니다. 상태 변경 시 이력을 덮어쓰지 않고 새 행을 추가합니다.
+- `RawJson`에는 마스킹된 JSON만 저장하고 API 키, 비밀키, 토큰은 저장하지 않습니다.
+- DB가 생성하는 시각은 `SYSUTCDATETIME()`과 `datetime2(3)`을 사용합니다.
+- 채널 계약에서 `int64`를 명시적으로 보장하지 않는 외부 식별자는 `nvarchar`를 사용합니다.
+- DDL은 멱등성을 보장하고 `SET XACT_ABORT ON`을 사용합니다.
+- 주문 확인·배송·취소 등 외부 상태 변경 API를 실행하지 않습니다.
 
 ---
 
-### Task 1: Add SQL Server prerequisites and object-contract verification
+### 작업 1: SQL Server 사전 조건 및 객체 계약 검증 추가
 
-**Files:**
-- Create: `sql/channel_orders/001_database_prerequisites.sql`
-- Create: `sql/channel_orders/005_verify_object_contract.sql`
+**파일:**
+- 생성: `sql/channel_orders/001_database_prerequisites.sql`
+- 생성: `sql/channel_orders/005_verify_object_contract.sql`
 
-**Interfaces:**
-- Consumes: SQL Server connection whose current database is `ecommerce`.
-- Produces: A safe execution preamble and a reusable object-contract check for all later tasks.
+**인터페이스:**
+- 입력: 현재 DB가 `ecommerce`인 SQL Server 연결.
+- 산출물: 안전한 실행 사전 점검과 후속 작업에서 재사용할 객체 계약 검증.
 
-- [ ] **Step 1: Write the failing object-contract verification**
+- [ ] **단계 1: 실패하는 객체 계약 검증 작성**
 
-Create `005_verify_object_contract.sql` with an expected-object table and failure aggregation:
+예상 객체 목록과 실패 집계 기능을 갖춘 `005_verify_object_contract.sql`을 생성합니다:
 
 ```sql
 SET NOCOUNT ON;
@@ -62,7 +62,7 @@ BEGIN
 END;
 ```
 
-Append this common-column check so every table must have `StagingId`, `CollectionRunId`, `CollectedAt`, `RawJson`, `PayloadHash`, `IsLatest`, and `CreatedAt`:
+모든 테이블에 `StagingId`, `CollectionRunId`, `CollectedAt`, `RawJson`, `PayloadHash`, `IsLatest`, `CreatedAt`이 있는지 검사하는 다음 공통 컬럼 검증을 추가합니다:
 
 ```sql
 DECLARE @CommonColumns table (ColumnName sysname NOT NULL PRIMARY KEY);
@@ -85,19 +85,19 @@ BEGIN
 END;
 ```
 
-- [ ] **Step 2: Run verification and confirm it fails before DDL exists**
+- [ ] **단계 2: DDL 생성 전에 검증이 실패하는지 확인**
 
-Run in SSMS SQLCMD mode or with `sqlcmd`:
+SSMS SQLCMD 모드 또는 `sqlcmd`로 실행합니다:
 
 ```powershell
 sqlcmd -S 222.122.41.213 -d ecommerce -E -b -i sql/channel_orders/005_verify_object_contract.sql
 ```
 
-Expected: non-zero exit with `51001` and all seven missing table names. If SQL authentication is required, use an interactive SSMS connection; do not put its password in a script or shell history.
+예상 결과: 오류 `51001`과 누락된 7개 테이블명이 표시되고 0이 아닌 코드로 종료됩니다. SQL 인증이 필요하면 SSMS에서 대화형으로 연결하고 비밀번호를 스크립트나 셸 이력에 남기지 않습니다.
 
-- [ ] **Step 3: Add the database safety preamble**
+- [ ] **단계 3: DB 안전 사전 점검 추가**
 
-Create `001_database_prerequisites.sql`:
+`001_database_prerequisites.sql`을 생성합니다:
 
 ```sql
 SET NOCOUNT ON;
@@ -113,30 +113,30 @@ SELECT DB_NAME() AS TargetDatabase,
        CAST(SERVERPROPERTY('ProductVersion') AS nvarchar(128)) AS SqlServerVersion;
 ```
 
-- [ ] **Step 4: Run the preamble in `ecommerce`**
+- [ ] **단계 4: `ecommerce`에서 사전 점검 실행**
 
-Expected: one row showing `TargetDatabase = ecommerce`; no objects are created.
+예상 결과: `TargetDatabase = ecommerce`인 한 행이 표시되며 객체는 생성되지 않습니다.
 
-- [ ] **Step 5: Commit**
+- [ ] **단계 5: 커밋**
 
 ```powershell
 git add sql/channel_orders/001_database_prerequisites.sql sql/channel_orders/005_verify_object_contract.sql
 git commit -m "test: add channel table contract checks"
 ```
 
-### Task 2: Create Naver SmartStore and Godomall order-item tables
+### 작업 2: 네이버 스마트스토어·고도몰 주문상품 테이블 생성
 
-**Files:**
-- Create: `sql/channel_orders/010_create_naver_godomall_tables.sql`
-- Modify: `sql/channel_orders/005_verify_object_contract.sql`
+**파일:**
+- 생성: `sql/channel_orders/010_create_naver_godomall_tables.sql`
+- 수정: `sql/channel_orders/005_verify_object_contract.sql`
 
-**Interfaces:**
-- Consumes: Common metadata contract from Task 1.
-- Produces: `dbo.NAVER_SMARTSTORE_ORDER_ITEM` and `dbo.GODOMALL_ORDER_ITEM`.
+**인터페이스:**
+- 입력: 작업 1의 공통 메타데이터 계약.
+- 산출물: `dbo.NAVER_SMARTSTORE_ORDER_ITEM`, `dbo.GODOMALL_ORDER_ITEM`.
 
-- [ ] **Step 1: Extend the verification with required channel columns**
+- [ ] **단계 1: 필수 채널 컬럼 검증 확장**
 
-Add assertions for these exact columns:
+다음 컬럼을 정확히 검증하도록 단언을 추가합니다:
 
 ```text
 NAVER_SMARTSTORE_ORDER_ITEM: ProductOrderId, OrderId, ProductId, OptionId,
@@ -151,11 +151,11 @@ PaymentStatus, DeliveryStatus, OrderedAt, PaidAt, DispatchedAt,
 DeliveryCompanyCode, TrackingNumber
 ```
 
-Expected before implementation: verification still fails with the two missing tables.
+구현 전 예상 결과: 두 테이블이 누락되어 검증이 계속 실패합니다.
 
-- [ ] **Step 2: Create the two tables idempotently**
+- [ ] **단계 2: 멱등성을 갖춘 두 테이블 생성**
 
-Implement `010_create_naver_godomall_tables.sql`. Both tables must start with this common contract:
+`010_create_naver_godomall_tables.sql`을 구현합니다. 두 테이블 모두 다음 공통 계약으로 시작해야 합니다:
 
 ```sql
 StagingId bigint IDENTITY(1,1) NOT NULL,
@@ -173,36 +173,36 @@ CONSTRAINT PK_<TABLE> PRIMARY KEY CLUSTERED (StagingId),
 CONSTRAINT CK_<TABLE>_RawJson CHECK (ISJSON(RawJson) = 1)
 ```
 
-Use `nvarchar(100)` for IDs and status codes, `nvarchar(500)` for names/options, `int` for quantities, `decimal(19,4)` for monetary values, and `datetime2(3)` for source timestamps. Mark the logical identifiers listed in the design document `NOT NULL`; channel fields not guaranteed by the API remain nullable.
+ID·상태 코드는 `nvarchar(100)`, 이름·옵션은 `nvarchar(500)`, 수량은 `int`, 금액은 `decimal(19,4)`, 원본 시각은 `datetime2(3)`을 사용합니다. 설계 문서의 논리 식별자는 `NOT NULL`로 지정하고 API가 보장하지 않는 채널 필드는 NULL을 허용합니다.
 
-- [ ] **Step 3: Execute the DDL twice**
+- [ ] **단계 3: DDL 두 번 실행**
 
-Run `001_database_prerequisites.sql`, then `010_create_naver_godomall_tables.sql` twice.
+`001_database_prerequisites.sql` 실행 후 `010_create_naver_godomall_tables.sql`을 두 번 실행합니다.
 
-Expected: both executions succeed and exactly two new tables exist; the second execution makes no changes.
+예상 결과: 두 번 모두 성공하고 새 테이블은 정확히 2개이며 두 번째 실행에서는 변경이 없습니다.
 
-- [ ] **Step 4: Run the contract verification**
+- [ ] **단계 4: 계약 검증 실행**
 
-Expected: verification reports only the five tables not implemented yet, not either table from this task.
+예상 결과: 이 작업의 두 테이블은 누락으로 보고되지 않고 아직 구현하지 않은 5개 테이블만 표시됩니다.
 
-- [ ] **Step 5: Commit**
+- [ ] **단계 5: 커밋**
 
 ```powershell
 git add sql/channel_orders/005_verify_object_contract.sql sql/channel_orders/010_create_naver_godomall_tables.sql
 git commit -m "feat: add Naver and Godomall order tables"
 ```
 
-### Task 3: Create Coupang and LotteON order-item tables
+### 작업 3: 쿠팡·롯데ON 주문상품 테이블 생성
 
-**Files:**
-- Create: `sql/channel_orders/020_create_coupang_lotteon_tables.sql`
-- Modify: `sql/channel_orders/005_verify_object_contract.sql`
+**파일:**
+- 생성: `sql/channel_orders/020_create_coupang_lotteon_tables.sql`
+- 수정: `sql/channel_orders/005_verify_object_contract.sql`
 
-**Interfaces:**
-- Consumes: Common metadata and type rules from Tasks 1-2.
-- Produces: `dbo.COUPANG_ORDER_ITEM` and `dbo.LOTTEON_ORDER_ITEM`.
+**인터페이스:**
+- 입력: 작업 1~2의 공통 메타데이터와 자료형 규칙.
+- 산출물: `dbo.COUPANG_ORDER_ITEM`, `dbo.LOTTEON_ORDER_ITEM`.
 
-- [ ] **Step 1: Add failing required-column assertions**
+- [ ] **단계 1: 실패하는 필수 컬럼 단언 추가**
 
 ```text
 COUPANG_ORDER_ITEM: ShipmentBoxId, OrderId, OrderItemId, VendorItemId,
@@ -217,35 +217,35 @@ OrderStatus, DeliveryStatus, OrderedAt, PaidAt, DispatchedAt,
 DeliveryCompletedAt, DeliveryCompanyCode, TrackingNumber
 ```
 
-- [ ] **Step 2: Create the two tables**
+- [ ] **단계 2: 두 테이블 생성**
 
-Implement `020_create_coupang_lotteon_tables.sql` with the common contract from Task 2. Use `nvarchar(100)` for marketplace identifiers, including numeric-looking Coupang IDs, so format changes and leading zeros remain lossless. Use `decimal(19,4)` for prices and amounts.
+작업 2의 공통 계약에 따라 `020_create_coupang_lotteon_tables.sql`을 구현합니다. 숫자처럼 보이는 쿠팡 ID를 포함한 쇼핑몰 식별자는 `nvarchar(100)`을 사용하여 형식 변경이나 앞자리 0을 보존합니다. 가격과 금액은 `decimal(19,4)`를 사용합니다.
 
-- [ ] **Step 3: Execute twice and verify idempotency**
+- [ ] **단계 3: 두 번 실행하여 멱등성 검증**
 
-Expected: no errors; exactly four total channel tables now exist.
+예상 결과: 오류 없이 채널 테이블이 총 4개 존재합니다.
 
-- [ ] **Step 4: Run the contract verification**
+- [ ] **단계 4: 계약 검증 실행**
 
-Expected: only `ELEVENST_ORDER_ITEM`, `SSG_ORDER_ITEM`, and `TOSS_SHOPPING_ORDER_ITEM` remain missing.
+예상 결과: `ELEVENST_ORDER_ITEM`, `SSG_ORDER_ITEM`, `TOSS_SHOPPING_ORDER_ITEM`만 누락으로 표시됩니다.
 
-- [ ] **Step 5: Commit**
+- [ ] **단계 5: 커밋**
 
 ```powershell
 git add sql/channel_orders/005_verify_object_contract.sql sql/channel_orders/020_create_coupang_lotteon_tables.sql
 git commit -m "feat: add Coupang and LotteON order tables"
 ```
 
-### Task 4: Create 11st and SSG order-item tables
+### 작업 4: 11번가·SSG 주문상품 테이블 생성
 
-**Files:**
-- Create: `sql/channel_orders/030_create_elevenst_ssg_tables.sql`
-- Modify: `sql/channel_orders/005_verify_object_contract.sql`
+**파일:**
+- 생성: `sql/channel_orders/030_create_elevenst_ssg_tables.sql`
+- 수정: `sql/channel_orders/005_verify_object_contract.sql`
 
-**Interfaces:**
-- Produces: `dbo.ELEVENST_ORDER_ITEM` and `dbo.SSG_ORDER_ITEM`.
+**인터페이스:**
+- 산출물: `dbo.ELEVENST_ORDER_ITEM`, `dbo.SSG_ORDER_ITEM`.
 
-- [ ] **Step 1: Add failing required-column assertions**
+- [ ] **단계 1: 실패하는 필수 컬럼 단언 추가**
 
 ```text
 ELEVENST_ORDER_ITEM: OrderNo, OrderProductNo, ProductId, OptionId,
@@ -260,33 +260,33 @@ ShippingProgressDetailCode, OrderReceivedAt, OrderCompletedAt,
 ScheduledShippingDate
 ```
 
-- [ ] **Step 2: Create the tables**
+- [ ] **단계 2: 테이블 생성**
 
-Implement `030_create_elevenst_ssg_tables.sql`. Store `OrdItemSeq`, `ShppSeq`, and 11st order-product numbers as `nvarchar(100)` because their external representation is controlled by the channel. Store `ScheduledShippingDate` as `date`; other source times use `datetime2(3)`.
+`030_create_elevenst_ssg_tables.sql`을 구현합니다. 외부 표현 형식을 채널이 관리하므로 `OrdItemSeq`, `ShppSeq`, 11번가 주문상품 번호는 `nvarchar(100)`으로 저장합니다. `ScheduledShippingDate`는 `date`, 나머지 원본 시각은 `datetime2(3)`을 사용합니다.
 
-- [ ] **Step 3: Execute twice and verify**
+- [ ] **단계 3: 두 번 실행하여 검증**
 
-Expected: six total channel tables exist and only the Toss table is missing from the contract check.
+예상 결과: 총 6개 채널 테이블이 존재하고 계약 검증에서 토스 테이블만 누락으로 표시됩니다.
 
-- [ ] **Step 4: Commit**
+- [ ] **단계 4: 커밋**
 
 ```powershell
 git add sql/channel_orders/005_verify_object_contract.sql sql/channel_orders/030_create_elevenst_ssg_tables.sql
 git commit -m "feat: add 11st and SSG order tables"
 ```
 
-### Task 5: Create the Toss Shopping order-item table
+### 작업 5: 토스쇼핑 주문상품 테이블 생성
 
-**Files:**
-- Create: `sql/channel_orders/040_create_toss_shopping_table.sql`
-- Modify: `sql/channel_orders/005_verify_object_contract.sql`
+**파일:**
+- 생성: `sql/channel_orders/040_create_toss_shopping_table.sql`
+- 수정: `sql/channel_orders/005_verify_object_contract.sql`
 
-**Interfaces:**
-- Produces: `dbo.TOSS_SHOPPING_ORDER_ITEM` keyed logically by `OrderProductId`.
+**인터페이스:**
+- 산출물: `OrderProductId`를 논리 키로 사용하는 `dbo.TOSS_SHOPPING_ORDER_ITEM`.
 
-- [ ] **Step 1: Add the failing Toss column contract**
+- [ ] **단계 1: 실패하는 토스 컬럼 계약 추가**
 
-Require these columns:
+다음 컬럼을 필수로 지정합니다:
 
 ```text
 OrderId, OrderProductId, ProductId, StockId, ProductName, OptionName,
@@ -298,19 +298,19 @@ DeliveryLocationType, NormalDeliveryFee, JejuDeliveryFee,
 MountainDeliveryFee, ProductManagementCode, ProductItemManagementCode
 ```
 
-- [ ] **Step 2: Create the Toss table**
+- [ ] **단계 2: 토스 테이블 생성**
 
-Implement `040_create_toss_shopping_table.sql` with `bigint` for `OrderId`, `OrderProductId`, `ProductId`, `StockId`, and `DeliveryFeeGroupId`, matching the official `int64` contract. Use `bigint` for the KRW integer amount fields and `datetime2(3)` for timestamp fields.
+`040_create_toss_shopping_table.sql`을 구현합니다. 공식 `int64` 계약에 맞춰 `OrderId`, `OrderProductId`, `ProductId`, `StockId`, `DeliveryFeeGroupId`는 `bigint`를 사용합니다. 원화 정수 금액은 `bigint`, 시각은 `datetime2(3)`을 사용합니다.
 
-Do not create columns for orderer, receiver, phone, or address plaintext. Those fields exist in the API but are not needed for the current dashboard and must be present only as masked tokens in `RawJson`.
+주문자·수취인·전화번호·주소 평문 컬럼은 생성하지 않습니다. API에는 있지만 현재 대시보드에는 불필요하므로 `RawJson`에 마스킹된 값으로만 포함합니다.
 
-- [ ] **Step 3: Execute twice and run the full contract verification**
+- [ ] **단계 3: 두 번 실행하고 전체 계약 검증 수행**
 
-Expected: both DDL runs succeed; `005_verify_object_contract.sql` exits successfully with no missing table or column messages.
+예상 결과: 두 DDL 실행이 모두 성공하고 `005_verify_object_contract.sql`이 누락 테이블·컬럼 메시지 없이 정상 종료됩니다.
 
-- [ ] **Step 4: Insert a masked Toss sample row**
+- [ ] **단계 4: 마스킹된 토스 표본 행 삽입**
 
-Use a transaction and roll it back:
+트랜잭션 안에서 실행한 뒤 롤백합니다:
 
 ```sql
 BEGIN TRANSACTION;
@@ -332,39 +332,39 @@ VALUES
 ROLLBACK TRANSACTION;
 ```
 
-Expected: insert succeeds and rollback leaves the table empty.
+예상 결과: 삽입이 성공하고 롤백 후 테이블은 비어 있습니다.
 
-- [ ] **Step 5: Commit**
+- [ ] **단계 5: 커밋**
 
 ```powershell
 git add sql/channel_orders/005_verify_object_contract.sql sql/channel_orders/040_create_toss_shopping_table.sql
 git commit -m "feat: add Toss Shopping order table"
 ```
 
-### Task 6: Add latest-row, collection-run, and payload indexes
+### 작업 6: 최신 행·수집 실행·페이로드 인덱스 추가
 
-**Files:**
-- Create: `sql/channel_orders/050_create_channel_order_indexes.sql`
-- Create: `sql/channel_orders/060_verify_history_constraints.sql`
+**파일:**
+- 생성: `sql/channel_orders/050_create_channel_order_indexes.sql`
+- 생성: `sql/channel_orders/060_verify_history_constraints.sql`
 
-**Interfaces:**
-- Consumes: all seven tables.
-- Produces: deterministic latest-row queries and uniqueness enforcement.
+**인터페이스:**
+- 입력: 전체 7개 테이블.
+- 산출물: 결과가 명확한 최신 행 조회 및 유일성 보장.
 
-- [ ] **Step 1: Write the failing history verification**
+- [ ] **단계 1: 실패하는 이력 검증 작성**
 
-Create `060_verify_history_constraints.sql` to assert each table has:
+각 테이블에 다음 인덱스가 있는지 검사하는 `060_verify_history_constraints.sql`을 생성합니다:
 
 - `IX_<TABLE>_CollectionRunId`
 - `IX_<TABLE>_Identity_CollectedAt`
-- `UX_<TABLE>_Latest` filtered with `WHERE IsLatest = 1`
+- `WHERE IsLatest = 1` 조건의 필터형 `UX_<TABLE>_Latest`
 - `IX_<TABLE>_Identity_PayloadHash`
 
-Query `sys.indexes` and `sys.index_columns`; throw `51003` with missing index names. Expected before Task 6 implementation: failure listing 28 indexes.
+`sys.indexes`와 `sys.index_columns`를 조회하고 누락 인덱스명과 함께 오류 `51003`을 발생시킵니다. 작업 6 구현 전에는 28개 인덱스를 표시하며 실패해야 합니다.
 
-- [ ] **Step 2: Create indexes idempotently**
+- [ ] **단계 2: 멱등성을 갖춘 인덱스 생성**
 
-Implement `050_create_channel_order_indexes.sql` using `IF NOT EXISTS` checks. For example:
+`IF NOT EXISTS` 검사로 `050_create_channel_order_indexes.sql`을 구현합니다. 예시는 다음과 같습니다:
 
 ```sql
 CREATE UNIQUE NONCLUSTERED INDEX UX_TOSS_SHOPPING_ORDER_ITEM_Latest
@@ -382,52 +382,52 @@ CREATE NONCLUSTERED INDEX IX_TOSS_SHOPPING_ORDER_ITEM_CollectionRunId
 ON dbo.TOSS_SHOPPING_ORDER_ITEM (CollectionRunId);
 ```
 
-Repeat with each channel's logical identity from the design spec.
+설계 명세의 채널별 논리 식별자에 대해 반복합니다.
 
-- [ ] **Step 3: Verify the latest-row invariant**
+- [ ] **단계 3: 최신 행 단일성 조건 검증**
 
-In a rolled-back transaction, insert one Toss row with `IsLatest = 1`, then attempt a second row with the same `OrderProductId` and `IsLatest = 1`.
+롤백할 트랜잭션 안에서 토스 행 하나를 `IsLatest = 1`로 삽입한 뒤 같은 `OrderProductId`와 `IsLatest = 1`을 가진 두 번째 행 삽입을 시도합니다.
 
-Expected: SQL Server error `2601` or `2627`. Update the first row to `IsLatest = 0`, insert the second row, and verify exactly one latest row and two total history rows before rollback.
+예상 결과: SQL Server 오류 `2601` 또는 `2627`이 발생합니다. 첫 행을 `IsLatest = 0`으로 바꾼 후 두 번째 행을 삽입하고, 롤백 전에 최신 행 1개와 전체 이력 행 2개인지 확인합니다.
 
-- [ ] **Step 4: Run both verification scripts**
+- [ ] **단계 4: 두 검증 스크립트 실행**
 
-Expected: `005_verify_object_contract.sql` and `060_verify_history_constraints.sql` both succeed.
+예상 결과: `005_verify_object_contract.sql`과 `060_verify_history_constraints.sql`이 모두 성공합니다.
 
-- [ ] **Step 5: Commit**
+- [ ] **단계 5: 커밋**
 
 ```powershell
 git add sql/channel_orders/050_create_channel_order_indexes.sql sql/channel_orders/060_verify_history_constraints.sql
 git commit -m "feat: enforce channel order history indexes"
 ```
 
-### Task 7: Add end-to-end verification, rollback, and operator documentation
+### 작업 7: 통합 검증·롤백·운영 문서 추가
 
-**Files:**
-- Create: `sql/channel_orders/090_verify_channel_order_tables.sql`
-- Create: `sql/channel_orders/099_drop_channel_order_tables.sql`
-- Create: `docs/channel-order-tables.md`
-- Modify: `SALES_TEAM_ORDER_COLLECTION_STATUS.md`
+**파일:**
+- 생성: `sql/channel_orders/090_verify_channel_order_tables.sql`
+- 생성: `sql/channel_orders/099_drop_channel_order_tables.sql`
+- 생성: `docs/channel-order-tables.md`
+- 수정: `SALES_TEAM_ORDER_COLLECTION_STATUS.md`
 
-**Interfaces:**
-- Consumes: every DDL and verification script.
-- Produces: repeatable deployment and recovery instructions for SSMS operators.
+**인터페이스:**
+- 입력: 모든 DDL 및 검증 스크립트.
+- 산출물: SSMS 운영자가 반복 실행할 수 있는 배포·복구 지침.
 
-- [ ] **Step 1: Create the end-to-end verification script**
+- [ ] **단계 1: 통합 검증 스크립트 생성**
 
-`090_verify_channel_order_tables.sql` must:
+`090_verify_channel_order_tables.sql`은 다음을 수행해야 합니다:
 
-1. Execute the object and index checks using SQLCMD `:r` includes.
-2. Verify every `RawJson` check constraint is enabled and trusted.
-3. Insert one masked sample into each table inside a transaction.
-4. Verify seven inserted rows and seven distinct `CollectionRunId` values.
-5. Roll back and verify no sample rows remain.
+1. SQLCMD `:r` 포함 명령으로 객체·인덱스 검증을 실행합니다.
+2. 모든 `RawJson` 검사 제약 조건이 활성화되고 신뢰 상태인지 확인합니다.
+3. 트랜잭션 안에서 테이블마다 마스킹 표본을 한 행씩 삽입합니다.
+4. 삽입 행 7개와 서로 다른 `CollectionRunId` 7개를 확인합니다.
+5. 롤백하고 표본 행이 남아 있지 않은지 확인합니다.
 
-Use only fictitious IDs and `***` for personal fields.
+가상 ID만 사용하고 개인정보 필드는 `***`로 처리합니다.
 
-- [ ] **Step 2: Create the rollback script**
+- [ ] **단계 2: 롤백 스크립트 생성**
 
-`099_drop_channel_order_tables.sql` must require an explicit SQLCMD variable:
+`099_drop_channel_order_tables.sql`은 명시적인 SQLCMD 변수를 요구해야 합니다:
 
 ```sql
 :setvar CONFIRM_DROP "NO"
@@ -435,42 +435,42 @@ IF N'$(CONFIRM_DROP)' <> N'YES'
     THROW 51009, N'Set CONFIRM_DROP=YES to remove channel order tables.', 1;
 ```
 
-Drop only the seven tables, in reverse creation order, with `IF OBJECT_ID(..., 'U') IS NOT NULL`. Do not drop `dbo` or unrelated ecommerce objects.
+`IF OBJECT_ID(..., 'U') IS NOT NULL` 검사로 생성의 역순으로 7개 테이블만 삭제합니다. `dbo`와 무관한 ecommerce 객체는 삭제하지 않습니다.
 
-- [ ] **Step 3: Write the operator guide**
+- [ ] **단계 3: 운영 가이드 작성**
 
-Document:
+다음 내용을 문서화합니다:
 
-- Exact execution order: `001`, `010`, `020`, `030`, `040`, `050`, `090`.
-- Target database confirmation in SSMS.
-- How to run scripts twice to validate idempotency.
-- How `IsLatest` history insertion must run inside a transaction.
-- UTC timestamp and masking rules.
-- How to run rollback with `CONFIRM_DROP=YES` in a non-production test database first.
+- 정확한 실행 순서: `001`, `010`, `020`, `030`, `040`, `050`, `090`.
+- SSMS에서 대상 DB를 확인하는 방법.
+- 스크립트를 두 번 실행하여 멱등성을 검증하는 방법.
+- 트랜잭션 안에서 `IsLatest` 이력을 삽입하는 방법.
+- UTC 시각 및 마스킹 규칙.
+- 먼저 비운영 테스트 DB에서 `CONFIRM_DROP=YES`로 롤백하는 방법.
 
-- [ ] **Step 4: Update the status document**
+- [ ] **단계 4: 현황 문서 갱신**
 
-Add a SQL implementation section listing the seven `dbo.*_ORDER_ITEM` tables, the deployment verification result, and the latest-row rule. Do not state that production deployment occurred unless it was actually executed against `ecommerce` and verified.
+7개 `dbo.*_ORDER_ITEM` 테이블, 배포 검증 결과, 최신 행 규칙을 정리한 SQL 구현 절을 추가합니다. 실제로 `ecommerce`에 실행하고 검증하지 않았다면 운영 배포가 완료되었다고 기록하지 않습니다.
 
-- [ ] **Step 5: Run static and database verification**
+- [ ] **단계 5: 정적 검사 및 DB 검증**
 
 ```powershell
 git diff --check
 rg -n "stg\.|CREATE SCHEMA|API_KEY|SECRET_KEY|ACCESS_TOKEN" sql docs
 ```
 
-Expected: no `stg.` or `CREATE SCHEMA`; key names may appear only in prose that states they must not be stored, never as values. Execute `090_verify_channel_order_tables.sql` in a disposable or approved test database and expect success.
+예상 결과: `stg.` 또는 `CREATE SCHEMA`가 없습니다. 인증 키 이름은 저장 금지를 설명하는 본문에만 나타날 수 있고 실제 값은 포함하지 않습니다. 폐기 가능한 DB 또는 승인된 테스트 DB에서 `090_verify_channel_order_tables.sql`이 성공하는지 확인합니다.
 
-- [ ] **Step 6: Commit**
+- [ ] **단계 6: 커밋**
 
 ```powershell
 git add sql/channel_orders docs/channel-order-tables.md SALES_TEAM_ORDER_COLLECTION_STATUS.md
 git commit -m "docs: add channel order table deployment guide"
 ```
 
-## Plan Self-Review
+## 계획 자체 검토
 
-- Spec coverage: all seven approved channel tables, one-row-per-order-item, history retention, masked JSON, indexes, verification, and rollback are assigned to tasks.
-- Placeholder scan: no `TBD`, `TODO`, or deferred implementation steps remain.
-- Type consistency: external IDs are `nvarchar` except official Toss `int64` fields; all common metadata names match the design spec.
-- Scope: common normalized tables and dashboard VIEW remain explicitly outside this plan.
+- 명세 범위: 승인된 7개 채널 테이블, 주문상품당 한 행, 이력 유지, 마스킹 JSON, 인덱스, 검증, 롤백이 모두 작업에 배정되어 있습니다.
+- 자리표시자 검사: `TBD`, `TODO`, 미뤄진 구현 단계가 없습니다.
+- 자료형 일관성: 공식 토스 `int64` 필드를 제외한 외부 ID는 `nvarchar`이며 공통 메타데이터 이름은 설계 명세와 일치합니다.
+- 범위: 공통 정규화 테이블과 대시보드 VIEW는 이 계획에서 제외합니다.

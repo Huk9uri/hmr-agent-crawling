@@ -219,7 +219,7 @@ QA와 운영 엔드포인트에 연결을 시도했으나 모두 방화벽 단�
 자체개발 방식으로 API를 호출하려면 ESM API 담당자에게 사용 범위, ESM 마스터 ID, 서비스 URL, 매출 규모 및 개발 기간을 제출하고 승인을 받아야 한다. 승인 후 발급받을 Secret Key와 다음 판매자 식별정보를 사용해 JWT를 생성한다.
 
 - ESM 마스터 ID
-- ESM Secret Key
+- ESM 비밀키
 - 지마켓 판매자 ID
 - 옥션 판매자 ID
 - 허용 서버 IP
@@ -422,7 +422,7 @@ Body: requestShppDirection (perdType=02, 시작일, 종료일)
 - [토스쇼핑 API 소개](https://shopping-docs.toss.im/dev)
 - [토스쇼핑 인증 토큰 발급](https://shopping-docs.toss.im/dev/api-1/token)
 - [토스쇼핑 주문 API](https://shopping-docs.toss.im/dev/api-2/order)
-- [SSG.COM Open API](https://eapi.ssgadm.com/info/main.ssg)
+- [SSG.COM 공개 API](https://eapi.ssgadm.com/info/main.ssg)
 - [SSG.COM 배송지시목록조회 API](https://eapi.ssgadm.com/info/shpp/listShppDirection.ssg)
 - [AliExpress Open Platform 주문목록 API](https://developer.alibaba.com/docs/api.htm?apiId=42270)
 - [AliExpress 해외 판매자 연동 절차](https://developer.alibaba.com/docs/doc.htm?articleId=108013&docType=1&treeId=502)

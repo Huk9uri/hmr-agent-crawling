@@ -271,9 +271,9 @@
 - 현재값만 조회하려면 반드시 `IsLatest = 1` 조건을 사용한다.
 - 상태 이력을 분석할 때는 논리키별 `CollectedAt` 순서로 조회한다.
 - 고객명, 전화번호, 주소, 이메일 등 개인정보는 정형 컬럼으로 저장하지 않으며 `RawJson`에서도 마스킹된다.
-# CJ OnStyle
+# CJ온스타일
 
-- Endpoint: `POST /delivery/getDeliveryList`
-- Lifecycle queries: delivery instruction (`dateType=2`, `deliveryStatus=2`), dispatch (`3`,`4`), completion (`4`,`5`), cancellation (`6`,`6`).
-- Stable identity: `orderNo + orderItemSequence + orderDetailSequence + orderProcessingSequence`.
-- Recipient, telephone, address, delivery-note, entrance-password, clearance-code, gift and free-text claim fields are not normalized into columns and are masked as `***` in `RawJson`.
+- 엔드포인트: `POST /delivery/getDeliveryList`
+- 주문·배송 단계별 조회: 배송 지시(`dateType=2`, `deliveryStatus=2`), 출고(`3`,`4`), 배송 완료(`4`,`5`), 취소(`6`,`6`).
+- 고정 식별자: `orderNo + orderItemSequence + orderDetailSequence + orderProcessingSequence`.
+- 수취인, 전화번호, 주소, 배송 메모, 공동현관 비밀번호, 통관부호, 선물 및 자유 입력 클레임 필드는 정규 컬럼으로 저장하지 않고 `RawJson`에서 `***`로 마스킹합니다.

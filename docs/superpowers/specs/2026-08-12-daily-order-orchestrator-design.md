@@ -1,65 +1,65 @@
-# Daily Order Collection Orchestrator Design
+# 일일 주문 수집 오케스트레이터 설계
 
-## Goal
+## 목표
 
-Run every currently supported production order collector once per day through a single orchestration entrypoint, isolate channel failures, retry transient failures, and persist a count-only audit trail that can later drive email alerts. Prepare Windows Task Scheduler scripts locally, but do not register a task until working on the actual server PC.
+현재 지원하는 모든 운영 주문 수집기를 단일 오케스트레이션 진입점으로 하루 한 번 실행합니다. 채널 실패를 격리하고 일시적 오류를 재시도하며, 추후 이메일 알림에 활용할 수 있는 건수 중심 감사 이력을 저장합니다. Windows 작업 스케줄러 스크립트는 로컬에서 준비하되 실제 서버 PC에서 작업하기 전에는 등록하지 않습니다.
 
-## Scope
+## 범위
 
-The daily run includes the seven deployed adapters: Naver SmartStore, Godomall, Coupang, LotteON, 11st, SSG.COM, and Toss Shopping. CJ OnStyle, Gmarket/Auction, and AliExpress remain excluded because production access or implemented collectors are not available.
+일일 실행은 배포된 7개 어댑터인 네이버 스마트스토어, 고도몰, 쿠팡, 롯데ON, 11번가, SSG.COM, 토스쇼핑을 포함합니다. CJ온스타일, G마켓/옥션, 알리익스프레스는 운영 접근 권한이나 구현된 수집기가 없어 제외합니다.
 
-SMTP delivery and the 14:30 missing-run watchdog are deferred until a corporate SMTP account is available. The execution-history schema must make both additions possible without changing collector behavior.
+SMTP 발송과 14:30 미실행 감시는 회사 SMTP 계정이 제공될 때까지 미룹니다. 실행 이력 스키마는 수집기 동작 변경 없이 두 기능을 추가할 수 있어야 합니다.
 
-## Architecture
+## 구조
 
-Add a dedicated orchestration command alongside the existing collection CLI. It runs each channel independently with that channel's verified maximum safe window ending on the run date. A failure never prevents later channels from running.
+기존 수집 CLI와 별도로 전용 오케스트레이션 명령을 추가합니다. 실행일을 종료일로 채널별 검증된 최대 안전 조회 기간을 사용하여 각 채널을 독립 실행합니다. 한 채널의 실패가 다음 채널 실행을 막지 않습니다.
 
-Each failed channel is retried up to two times after a configurable delay. Tests inject a no-wait sleep function; production defaults to ten minutes. Successful empty API responses are recorded separately from failures.
+실패 채널은 설정 가능한 대기 시간 후 최대 두 번 재시도합니다. 테스트에서는 대기하지 않는 함수를 주입하고 운영 기본값은 10분으로 둡니다. 성공한 빈 API 응답은 실패와 구분하여 기록합니다.
 
-A run-level row and one channel-attempt row per attempt are written to SQL Server. Audit rows contain identifiers, timestamps, status, counts, attempt number, and a sanitized error category only. They never contain credentials, URLs with query strings, response bodies, order identifiers, personal data, or exception messages.
+SQL Server에 실행 단위 행과 시도마다 채널 시도 행을 저장합니다. 감사 행에는 실행·시도 식별자, 시각, 상태, 건수, 시도 번호, 민감정보를 제거한 오류 분류만 포함합니다. 인증 정보, 쿼리 문자열이 있는 URL, 응답 본문, 주문 식별자, 개인정보, 예외 메시지는 포함하지 않습니다.
 
-## Status model
+## 상태 모델
 
-Run status:
+실행 상태:
 
-- `RUNNING`: orchestration started but has not reached a terminal state.
-- `SUCCESS`: every channel ended in `SUCCESS_WITH_DATA` or `SUCCESS_EMPTY`.
-- `PARTIAL`: at least one channel succeeded and at least one channel failed after retries.
-- `FAILED`: no channel succeeded, or orchestration could not initialize.
+- `RUNNING`: 오케스트레이션이 시작되었지만 최종 상태에 도달하지 않았습니다.
+- `SUCCESS`: 모든 채널이 `SUCCESS_WITH_DATA` 또는 `SUCCESS_EMPTY`로 종료되었습니다.
+- `PARTIAL`: 하나 이상의 채널이 성공하고 하나 이상은 재시도 후에도 실패했습니다.
+- `FAILED`: 성공한 채널이 없거나 오케스트레이션 초기화에 실패했습니다.
 
-Channel-attempt status:
+채널 시도 상태:
 
-- `SUCCESS_WITH_DATA`: API and database write succeeded with one or more collected records.
-- `SUCCESS_EMPTY`: API succeeded and returned zero records.
-- `FAILED_API`: HTTP transport or remote business response failure.
-- `FAILED_PARSE`: response decoding, validation, or mapping failure.
-- `FAILED_DB`: database connection or persistence failure.
-- `FAILED_CONFIG`: required configuration was unavailable or invalid.
-- `FAILED_INTERNAL`: an unexpected sanitized failure category.
+- `SUCCESS_WITH_DATA`: API와 DB 저장이 성공했으며 수집 레코드가 1건 이상입니다.
+- `SUCCESS_EMPTY`: API가 성공했지만 반환 레코드는 0건입니다.
+- `FAILED_API`: HTTP 통신 또는 원격 업무 응답 실패입니다.
+- `FAILED_PARSE`: 응답 디코딩·검증·매핑 실패입니다.
+- `FAILED_DB`: DB 연결 또는 저장 실패입니다.
+- `FAILED_CONFIG`: 필수 설정이 없거나 유효하지 않습니다.
+- `FAILED_INTERNAL`: 예상하지 못한 오류를 민감정보 없이 분류한 상태입니다.
 
-## Database schema
+## 데이터베이스 스키마
 
-Create `dbo.CHANNEL_COLLECTION_RUN` for one daily orchestration execution and `dbo.CHANNEL_COLLECTION_ATTEMPT` for channel attempts. Foreign-key channel attempts to the run. Index the run scheduled date and terminal status, and index channel/date/status queries needed by a future watchdog.
+일일 오케스트레이션 실행용 `dbo.CHANNEL_COLLECTION_RUN`과 채널 시도용 `dbo.CHANNEL_COLLECTION_ATTEMPT`를 생성하고 외래 키로 연결합니다. 실행 예약 날짜·최종 상태와 향후 감시에 필요한 채널·날짜·상태 조회를 인덱싱합니다.
 
-The orchestrator uses a separate audit connection from channel data writers. Attempt audit writes are committed independently so a channel transaction rollback does not erase evidence of failure. If audit persistence itself fails, the process exits nonzero and writes a count-only JSON summary to standard output.
+오케스트레이터는 채널 데이터 저장기와 별도 감사 연결을 사용합니다. 시도 감사 기록을 독립 커밋하여 채널 트랜잭션 롤백으로 실패 근거가 사라지지 않게 합니다. 감사 저장 자체가 실패하면 0이 아닌 종료 코드를 반환하고 표준 출력에 건수 중심 JSON 요약을 남깁니다.
 
-## Concurrency and exit behavior
+## 동시 실행 및 종료 동작
 
-Use a SQL Server application lock keyed to the daily orchestrator. If another process holds the lock, exit nonzero without starting collectors. This prevents a manual run and the scheduled run from overlapping across Windows sessions.
+일일 오케스트레이터를 키로 하는 SQL Server 애플리케이션 잠금을 사용합니다. 다른 프로세스가 잠금을 보유하면 수집기를 시작하지 않고 0이 아닌 코드로 종료합니다. 이를 통해 Windows 세션이 달라도 수동 실행과 예약 실행이 겹치지 않게 합니다.
 
-Exit code is zero only when all channels reach a success state. Partial and failed runs return nonzero so Windows Task Scheduler records a failure result.
+모든 채널이 성공 상태에 도달한 경우에만 종료 코드 0을 반환합니다. 부분 성공과 실패는 0이 아닌 코드를 반환하여 Windows 작업 스케줄러에 실패로 기록되게 합니다.
 
-## Windows integration
+## Windows 연동
 
-Provide two PowerShell scripts:
+PowerShell 스크립트 두 개를 제공합니다:
 
-- A launcher that resolves absolute project, Python, configuration, and log paths; sets `PYTHONPATH`; runs the orchestrator; and preserves its exit code.
-- An installer that validates prerequisites and creates a daily 14:00 task on the machine where it is executed.
+- 프로젝트·Python·설정·로그의 절대 경로를 확정하고 `PYTHONPATH`를 설정한 뒤 오케스트레이터를 실행하고 종료 코드를 유지하는 실행 스크립트.
+- 사전 조건을 검증하고 실행한 컴퓨터에 매일 14:00 작업을 생성하는 설치 스크립트.
 
-The installer defaults to the Windows `SYSTEM` account so the job runs while users are logged out. It must refuse installation when paths are missing and must support a validation mode that prints the intended task definition without changing Task Scheduler.
+설치 스크립트는 사용자 로그아웃 중에도 실행되도록 기본 Windows `SYSTEM` 계정을 사용합니다. 경로가 없으면 설치를 거부하고, 작업 스케줄러를 변경하지 않은 채 예정 작업 정의를 출력하는 검증 모드를 지원해야 합니다.
 
-Task Scheduler registration is deliberately not executed on the local development PC. It will be run and validated after remote access to the actual server PC.
+로컬 개발 PC에서는 작업 스케줄러 등록을 수행하지 않습니다. 실제 서버 PC에 원격 접속한 후 실행하고 검증합니다.
 
-## Verification
+## 검증
 
-Use test-driven development for status classification, retries, channel isolation, audit writes, application-lock behavior, safe output, PowerShell argument construction, and task-definition validation. Run the full existing Python test suite plus focused PowerShell-safe static/behavioral tests. Apply the SQL migration to the current development/operating database only after its idempotency and schema-contract tests pass.
+상태 분류, 재시도, 채널 격리, 감사 저장, 애플리케이션 잠금, 안전한 출력, PowerShell 인자 구성 및 작업 정의 검증에 테스트 주도 개발을 적용합니다. 기존 전체 Python 테스트와 PowerShell용 정적·동작 검증을 실행합니다. SQL 마이그레이션은 멱등성·스키마 계약 테스트가 통과한 뒤 현재 개발·운영 DB에 적용합니다.
