@@ -30,7 +30,7 @@
 
 ## 설치 및 설정
 
-Python 3.12를 사용합니다. DB 저장에는 SQL Server와 접속 계정이 필요하며, 채널에 따라 수집 서버의 공인 IP 등록이 필요합니다. 아래 명령은 저장소 루트의 PowerShell에서 실행합니다.
+Python 3.12를 사용합니다. DB 저장에는 SQL Server와 접속 계정이 필요하며, 채널에 따라 수집 서버의 IP 등록이 필요합니다. 아래 명령은 저장소 루트의 PowerShell에서 실행합니다.
 
 ```powershell
 py -3.12 -m venv .venv
@@ -56,9 +56,7 @@ $env:PYTHONPATH = Join-Path (Get-Location).Path 'src'
 
 `DB_NAME` 예시는 `ecommerce`, `DB_PORT` 기본값은 `1433`입니다. `ORCHESTRATOR_MAX_WORKERS` 기본값은 `4`이며 `1`부터 등록 채널 수인 `8`까지 설정할 수 있습니다.
 
-설정은 기본적으로 `.env`에서 읽으며 `--config`로 다른 파일을 지정할 수 있습니다. 운영체제 환경변수를 자동으로 병합하지 않습니다. 현재 구현은 단일 채널 실행에서도 전체 어댑터를 생성하므로 **8개 채널의 API 인증 정보를 모두 설정해야 합니다**. DB 설정은 CLI의 `--write-db` 및 정기 수집 실행에 필요합니다.
-
-`.env`와 실제 인증 정보는 커밋하지 않습니다. 운영 서버에서는 설정 파일 접근 권한을 제한합니다.
+설정은 기본적으로 `.env`에서 읽으며 `--config`로 다른 파일을 지정할 수 있습니다. 운영체제 환경변수를 자동으로 병합하지 않습니다. DB 설정은 CLI의 `--write-db` 및 정기 수집 실행에 필요합니다.
 
 ## 수동 수집
 
@@ -75,7 +73,7 @@ $env:PYTHONPATH = Join-Path (Get-Location).Path 'src'
   --channel naver --from 2026-10-24 --to 2026-10-24 --dry-run
 ```
 
-날짜는 `YYYY-MM-DD` 형식이며 미래 날짜는 허용하지 않습니다. 지정 기간이 채널의 요청당 조회 기간보다 길면 자동으로 분할합니다.
+날짜는 `YYYY-MM-DD` 형식입니다. 지정 기간이 채널의 요청당 조회 기간보다 길면 자동으로 분할합니다.
 
 `--dry-run`은 실제 API를 호출하여 수집 결과를 확인하고 DB에는 저장하지 않습니다. 모드를 생략해도 dry-run으로 실행됩니다. DB 저장은 스키마 준비 후 `--dry-run`을 `--write-db`로 바꾸어 실행합니다.
 
@@ -99,7 +97,7 @@ $env:PYTHONPATH = Join-Path (Get-Location).Path 'src'
 
 ### 출력과 종료 코드
 
-CLI는 채널별 `status`, `windows`, `pages`, `records`, `inserted`, `changed`, `skipped` 등을 JSON으로 출력합니다. 주문 원문·개인정보·인증 정보는 출력하지 않습니다.
+CLI는 채널별 `status`, `windows`, `pages`, `records`, `inserted`, `changed`, `skipped` 등을 JSON으로 출력합니다.
 
 | 종료 코드 | 의미 |
 | --- | --- |
@@ -154,9 +152,9 @@ $projectRoot = (Get-Location).Path
   -ValidateOnly
 ```
 
-검증 후 관리자 PowerShell에서 `-ValidateOnly`를 제외하고 실행하면 매일 서버 현지 시각 **14:00**, `SYSTEM` 계정으로 작업을 등록합니다. 기본 로그 경로는 `C:\ProgramData\HMR_Order_Collection\logs`입니다. `SYSTEM`의 파일 접근 권한과 DB 접속을 확인해야 합니다.
+검증 후 관리자 PowerShell에서 `-ValidateOnly`를 제외하고 실행하면 매일 시각 **14:00**, `SYSTEM` 계정으로 작업을 등록합니다. 기본 로그 경로는 `C:\ProgramData\HMR_Order_Collection\logs`입니다. `SYSTEM`의 파일 접근 권한과 DB 접속을 확인해야 합니다.
 
-감사 이력 조회, 실패 상태 해석, 작업 해제 방법은 [정기 수집 운영 가이드](docs/daily-order-collection-operations.md)를 참고하세요. SMTP 알림과 별도 미실행 감시는 현재 후속 구현 대상입니다.
+감사 이력 조회, 실패 상태 해석, 작업 해제 방법은 [정기 수집 운영 가이드](docs/daily-order-collection-operations.md)를 참고하세요. 
 
 ## 개발 및 테스트
 
